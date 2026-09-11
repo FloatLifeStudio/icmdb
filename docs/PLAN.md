@@ -46,7 +46,8 @@ pending_changes    冲突待裁决(同设备合并为一条)
 └─ created_at, resolved_at
 
 change_history     变更流水(仅记录裁决生效的改动)
-└─ id, device_id(FK), summary, source, created_at
+├─ id, device_id(不设外键:设备硬删后历史独立存活), summary, source
+└─ created_at
 ```
 
 ## 3. 目录结构(标准 Python 项目布局)
@@ -72,7 +73,8 @@ change_history     变更流水(仅记录裁决生效的改动)
 │       │   └── resolve.py      # 裁决应用:按字段选择新旧、写 change_history
 │       └── api/
 │           ├── devices.py      # POST 推送、GET 列表/详情、DELETE
-│           └── pending_changes.py  # GET 列表/详情、POST resolve
+│           ├── pending_changes.py  # GET 列表/详情、POST resolve
+│           └── history.py      # GET 变更历史(只读,可按设备过滤)
 ├── tests/
 │   ├── conftest.py             # 临时 SQLite 库 fixture + TestClient
 │   ├── test_diff.py
@@ -125,9 +127,12 @@ change_history     变更流水(仅记录裁决生效的改动)
 | DELETE | /api/v1/devices/{id} | 手工删除设备 |
 | GET | /api/v1/pending-changes | 待裁决列表 |
 | GET | /api/v1/pending-changes/{id} | diff 详情 |
-| POST | /api/v1/pending-changes/{id}/resolve | 裁决(逐字段选择) |
+| POST | /api/v1/pending-changes/{id}/resolve | 裁决(逐条目选 new/old) |
+| GET | /api/v1/change-history | 变更历史(只读,可按设备过滤) |
 
 ## 6. 实施步骤(git commit 按 Angular 规范 + gitmoji)
+
+> 状态:实施完成(2026-09-11),commit `1eb95b7`..`4d897c7`,含本次文档更新共 8 个提交。
 
 | # | Commit | 内容 |
 |---|---|---|
