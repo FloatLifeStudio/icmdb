@@ -202,6 +202,8 @@ async function submit() {
   if (!pending.value) return
   resolving.value = true
   const resolvedId = pending.value.id
+  // 记住当前项在列表中的位置,裁决后从刷新后列表的同一位置继续
+  const idx = Math.max(0, pendings.value.findIndex((p) => p.id === resolvedId))
   try {
     const res = await api.resolve(resolvedId, {
       field_choices: fieldChoices.value,
@@ -213,8 +215,9 @@ async function submit() {
         : '裁决已提交(保留现状,无实际改动)'
     )
     await load()
-    // 自动切换到下一条待裁决,无需再手动点选
-    const next = pendings.value.find((p) => p.id > resolvedId) ?? null
+    // 自动切换到下一条:同一位置(即原下一条);裁决的是最后一条则回到列表开头
+    const rest = pendings.value
+    const next = rest.length ? rest[idx % rest.length] : null
     selectPending(next)
     tableRef.value?.setCurrentRow(next ?? undefined)
     if (!next) ElMessage.info('所有待裁决记录已处理完毕')
