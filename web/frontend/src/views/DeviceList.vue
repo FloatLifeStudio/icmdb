@@ -40,7 +40,9 @@
         @confirm="batchRemove"
       >
         <template #reference>
-          <el-button type="danger" :disabled="!selected.length">批量删除</el-button>
+          <el-button type="danger" :disabled="!selected.length">
+            批量删除{{ selected.length ? `(${selected.length})` : '' }}
+          </el-button>
         </template>
       </el-popconfirm>
     </div>
