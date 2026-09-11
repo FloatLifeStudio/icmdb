@@ -19,6 +19,11 @@
         </div>
       </template>
       <el-table :data="stats?.recent_changes || []" border>
+        <el-table-column type="expand" width="40">
+          <template #default="{ row }">
+            <DiffDetail :diff="row.diff" />
+          </template>
+        </el-table-column>
         <el-table-column prop="created_at" label="时间" min-width="170">
           <template #default="{ row }">{{ fmt(row.created_at) }}</template>
         </el-table-column>
@@ -29,7 +34,9 @@
             </router-link>
           </template>
         </el-table-column>
-        <el-table-column prop="summary" label="变更内容" min-width="300" />
+        <el-table-column label="变更内容" min-width="200">
+          <template #default="{ row }">{{ digest(row) }}</template>
+        </el-table-column>
         <el-table-column prop="source" label="来源" width="120">
           <template #default="{ row }">{{ row.source || '-' }}</template>
         </el-table-column>
@@ -41,10 +48,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { api, DashboardOut } from '../api'
+import { api, DashboardOut, HistoryRow } from '../api'
+import DiffDetail from '../components/DiffDetail.vue'
 
 const stats = ref<DashboardOut | null>(null)
 const loading = ref(false)
+
+// 变更内容紧凑概览:字段/网卡条目数,完整明细在展开行
+function digest(row: HistoryRow): string {
+  const diff = row.diff as { fields?: unknown[]; nics?: unknown[] } | null
+  if (!diff) return '-'
+  const parts: string[] = []
+  const nf = diff.fields?.length ?? 0
+  const nn = diff.nics?.length ?? 0
+  if (nf) parts.push(`字段 ${nf} 项`)
+  if (nn) parts.push(`网卡 ${nn} 块`)
+  return parts.length ? parts.join(' + ') : '-'
+}
 
 const statCards = computed(() => [
   { label: '资产总数', value: stats.value?.total_devices ?? '-', color: '#409eff' },

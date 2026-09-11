@@ -78,21 +78,19 @@
     <el-card class="card">
       <template #header>变更历史(裁决生效的改动)</template>
       <el-table :data="history" border v-loading="historyLoading">
+        <el-table-column type="expand" width="40">
+          <template #default="{ row }">
+            <DiffDetail :diff="row.diff" />
+          </template>
+        </el-table-column>
         <el-table-column prop="created_at" label="时间" min-width="170">
           <template #default="{ row }">{{ fmt(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column label="变更内容" min-width="300">
-          <template #default="{ row }">{{ fmtSummary(row.summary) }}</template>
+        <el-table-column label="变更内容" min-width="200">
+          <template #default="{ row }">{{ digest(row) }}</template>
         </el-table-column>
         <el-table-column prop="source" label="来源" width="120">
           <template #default="{ row }">{{ row.source || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="详情" width="80">
-          <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="showDiff(row)">
-              查看
-            </el-button>
-          </template>
         </el-table-column>
       </el-table>
     </el-card>
@@ -108,45 +106,6 @@
         <el-button type="primary" @click="saveTags">保存</el-button>
       </template>
     </el-dialog>
-
-    <el-dialog v-model="diffDialogVisible" title="变更详情" width="700px">
-      <template v-if="diffRow">
-        <el-descriptions :column="2" border class="diff-desc">
-          <el-descriptions-item label="时间">{{ fmt(diffRow.created_at) }}</el-descriptions-item>
-          <el-descriptions-item label="来源">{{ diffRow.source || '-' }}</el-descriptions-item>
-        </el-descriptions>
-        <template v-if="diffRow.diff">
-          <h4>主机字段</h4>
-          <el-table :data="diffRow.diff.fields" border size="small">
-            <el-table-column label="字段" min-width="120">
-              <template #default="{ row }">{{ fieldLabel(row.field) }}</template>
-            </el-table-column>
-            <el-table-column label="旧值" min-width="140">
-              <template #default="{ row }">{{ row.old ?? '-' }}</template>
-            </el-table-column>
-            <el-table-column label="新值" min-width="140">
-              <template #default="{ row }">{{ row.new ?? '-' }}</template>
-            </el-table-column>
-          </el-table>
-          <h4>网卡</h4>
-          <el-table :data="diffRow.diff.nics" border size="small">
-            <el-table-column prop="name" label="网卡" width="100" />
-            <el-table-column label="类型" width="100">
-              <template #default="{ row }">{{ kindLabel[row.kind] || row.kind }}</template>
-            </el-table-column>
-            <el-table-column label="变化" min-width="260">
-              <template #default="{ row }">
-                <div v-for="(c, i) in row.changes" :key="i">
-                  {{ fieldLabel(c.field) }}: {{ fmtChange(c) }}
-                </div>
-                <span v-if="!row.changes.length">-</span>
-              </template>
-            </el-table-column>
-          </el-table>
-        </template>
-        <el-empty v-else description="该记录无 diff 详情(历史数据)" />
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -154,7 +113,8 @@
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { api, DeviceOut, HistoryRow, NicDiff, FieldDiff } from '../api'
+import { api, DeviceOut, HistoryRow } from '../api'
+import DiffDetail from '../components/DiffDetail.vue'
 
 const route = useRoute()
 const deviceId = Number(route.params.id)
@@ -164,38 +124,17 @@ const loading = ref(false)
 const historyLoading = ref(false)
 const tagDialogVisible = ref(false)
 const tagInput = ref('')
-const diffDialogVisible = ref(false)
-const diffRow = ref<HistoryRow | null>(null)
 
-const kindLabel: Record<string, string> = {
-  added: '新增',
-  removed: '候删',
-  changed: '有变化',
-}
-
-// 主机字段路径 -> 人类可读名称
-const fieldLabels: Record<string, string> = {
-  hostname: '主机名',
-  serial_number: '序列号',
-  mgmt_mac: '管理 MAC',
-  mgmt_ip: '管理 IP',
-  mgmt_prefix_length: '子网前缀',
-  mac: 'MAC',
-  ips: 'IP 列表',
-}
-function fieldLabel(f: string): string {
-  return fieldLabels[f] ?? f
-}
-
-// 变更摘要兼容旧记录:字段路径替换为中文(新记录后端已直接输出中文)
-function fmtSummary(s: string): string {
-  return s
-    .replace(/mgmt\.mac/g, '管理 MAC')
-    .replace(/mgmt\.ip/g, '管理 IP')
-    .replace(/mgmt_prefix_length/g, '子网前缀')
-    .replace(/serial_number/g, '序列号')
-    .replace(/mac:/g, 'MAC:')
-    .replace(/ips/g, 'IP 列表')
+// 变更内容紧凑概览:字段/网卡条目数,完整明细在展开行
+function digest(row: HistoryRow): string {
+  const diff = row.diff as { fields?: unknown[]; nics?: unknown[] } | null
+  if (!diff) return '-'
+  const parts: string[] = []
+  const nf = diff.fields?.length ?? 0
+  const nn = diff.nics?.length ?? 0
+  if (nf) parts.push(`字段 ${nf} 项`)
+  if (nn) parts.push(`网卡 ${nn} 块`)
+  return parts.length ? parts.join(' + ') : '-'
 }
 
 function fmt(ts: string | null): string {
@@ -203,24 +142,6 @@ function fmt(ts: string | null): string {
   // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
   const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z'
   return new Date(utc).toLocaleString()
-}
-
-function fmtChange(change: FieldDiff): string {
-  if (change.field === 'ips') {
-    const ips = (v: unknown) =>
-      ((v as { ip: string }[]) || []).map((i) => i.ip).join(', ') || '无'
-    return `${ips(change.old)} -> ${ips(change.new)}`
-  }
-  return `${change.old} -> ${change.new}`
-}
-
-function nicDiffKind(n: NicDiff): string {
-  return n.kind
-}
-
-function showDiff(row: HistoryRow) {
-  diffRow.value = row
-  diffDialogVisible.value = true
 }
 
 function openTagEdit() {
@@ -290,8 +211,5 @@ onMounted(async () => {
 }
 .tag {
   margin-right: 4px;
-}
-.diff-desc {
-  margin-bottom: 12px;
 }
 </style>
