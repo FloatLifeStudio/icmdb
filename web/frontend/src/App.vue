@@ -1,0 +1,42 @@
+<template>
+  <el-container class="layout">
+    <el-aside width="200px" class="aside">
+      <div class="logo">CMDB</div>
+      <el-menu router :default-active="$route.path" class="menu">
+        <el-menu-item index="/devices">
+          <el-icon><Monitor /></el-icon>资产列表
+        </el-menu-item>
+        <el-menu-item index="/conflicts">
+          <el-icon><EditPen /></el-icon>冲突裁决
+        </el-menu-item>
+      </el-menu>
+    </el-aside>
+    <el-main class="main">
+      <router-view />
+    </el-main>
+  </el-container>
+</template>
+
+<script setup lang="ts">
+import { Monitor, EditPen } from '@element-plus/icons-vue'
+</script>
+
+<style scoped>
+.layout {
+  min-height: 100vh;
+}
+.aside {
+  border-right: 1px solid var(--el-border-color-light);
+}
+.logo {
+  font-size: 20px;
+  font-weight: bold;
+  padding: 20px 16px;
+}
+.menu {
+  border-right: none;
+}
+.main {
+  background: var(--el-bg-color-page);
+}
+</style>

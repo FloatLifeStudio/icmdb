@@ -1,0 +1,204 @@
+<template>
+  <div>
+    <el-card class="card" v-loading="listLoading">
+      <template #header>待裁决列表</template>
+      <el-table
+        :data="pendings"
+        highlight-current-row
+        @current-change="selectPending"
+      >
+        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="device_id" label="设备 ID" width="80" />
+        <el-table-column prop="source" label="来源" width="120">
+          <template #default="{ row }">{{ row.source || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="推送时间" min-width="170">
+          <template #default="{ row }">{{ fmt(row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100" />
+      </el-table>
+    </el-card>
+
+    <template v-if="pending">
+      <el-card class="card">
+        <template #header>主机字段差异(设备 #{{ pending.device_id }})</template>
+        <el-table :data="pending.diff.fields" border>
+          <el-table-column prop="field" label="字段" min-width="140" />
+          <el-table-column label="旧值(库中)" min-width="180">
+            <template #default="{ row }">{{ row.old ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column label="新值(推送)" min-width="180">
+            <template #default="{ row }">{{ row.new ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column label="裁决" width="220">
+            <template #default="{ row }">
+              <el-radio-group v-model="fieldChoices[row.field]">
+                <el-radio value="old">保留旧值</el-radio>
+                <el-radio value="new">采用新值</el-radio>
+              </el-radio-group>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+
+      <el-card class="card" v-for="entry in pending.diff.nics" :key="entry.name">
+        <template #header>
+          网卡 {{ entry.name }}
+          <el-tag :type="kindTag[entry.kind]" class="kind-tag">
+            {{ kindLabel[entry.kind] }}
+          </el-tag>
+        </template>
+
+        <el-descriptions :column="1" border class="nic-detail">
+          <el-descriptions-item v-if="entry.old" label="旧状态">
+            {{ nicRepr(entry.old) }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="entry.new" label="新状态">
+            {{ nicRepr(entry.new) }}
+          </el-descriptions-item>
+          <el-descriptions-item
+            v-for="(change, i) in entry.changes"
+            :key="i"
+            :label="change.field"
+          >
+            {{ fmtChange(change) }}
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <el-radio-group v-model="nicChoices[entry.name]" class="nic-choice">
+          <el-radio value="old">{{ kindOldLabel[entry.kind] }}</el-radio>
+          <el-radio value="new">{{ kindNewLabel[entry.kind] }}</el-radio>
+        </el-radio-group>
+      </el-card>
+
+      <div class="actions" v-if="pending.diff.fields.length || pending.diff.nics.length">
+        <el-button type="primary" :loading="resolving" @click="submit">
+          提交裁决
+        </el-button>
+      </div>
+      <el-empty
+        v-else
+        description="该记录无差异条目"
+      />
+    </template>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api, NicDiff, PendingChange } from '../api'
+
+const pendings = ref<PendingChange[]>([])
+const pending = ref<PendingChange | null>(null)
+const fieldChoices = ref<Record<string, string>>({})
+const nicChoices = ref<Record<string, string>>({})
+const listLoading = ref(false)
+const resolving = ref(false)
+
+const kindLabel: Record<string, string> = {
+  added: '新增',
+  removed: '候删',
+  changed: '有变化',
+}
+const kindTag: Record<string, string> = {
+  added: 'success',
+  removed: 'danger',
+  changed: 'warning',
+}
+const kindOldLabel: Record<string, string> = {
+  added: '丢弃(不新增)',
+  removed: '保留(不删除)',
+  changed: '保留旧值',
+}
+const kindNewLabel: Record<string, string> = {
+  added: '新增该网卡',
+  removed: '删除该网卡',
+  changed: '采用新值',
+}
+
+function fmt(ts: string): string {
+  return new Date(ts).toLocaleString()
+}
+
+function nicRepr(nic: Record<string, unknown>): string {
+  const mac = nic.mac ? `MAC ${nic.mac}` : '无 MAC'
+  const ips = (nic.ips as { ip: string; prefix_length: number | null }[]) || []
+  const ipStr = ips.map((i) => i.ip + (i.prefix_length ? '/' + i.prefix_length : ''))
+  return `${nic.name}(${mac}),IP: ${ipStr.length ? ipStr.join(', ') : '无'}`
+}
+
+function fmtChange(change: { field: string; old: unknown; new: unknown }): string {
+  if (change.field === 'ips') {
+    const ips = (v: unknown) =>
+      ((v as { ip: string }[]) || []).map((i) => i.ip).join(', ') || '无'
+    return `IP: ${ips(change.old)} -> ${ips(change.new)}`
+  }
+  return `${change.old} -> ${change.new}`
+}
+
+async function load() {
+  listLoading.value = true
+  try {
+    const res = await api.listPendingChanges('pending')
+    pendings.value = res.items
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    listLoading.value = false
+  }
+}
+
+function selectPending(row: PendingChange | null) {
+  pending.value = row
+  // 默认全部保留现状(old),由用户逐条选择
+  fieldChoices.value = {}
+  nicChoices.value = {}
+  if (row) {
+    for (const f of row.diff.fields) fieldChoices.value[f.field] = 'old'
+    for (const n of row.diff.nics) nicChoices.value[n.name] = 'old'
+  }
+}
+
+async function submit() {
+  if (!pending.value) return
+  resolving.value = true
+  try {
+    const res = await api.resolve(pending.value.id, {
+      field_choices: fieldChoices.value,
+      nic_choices: nicChoices.value,
+    })
+    ElMessage.success(
+      res.applied.length
+        ? `裁决生效:${res.applied.join('; ')}`
+        : '裁决已提交(保留现状,无实际改动)'
+    )
+    pending.value = null
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    resolving.value = false
+  }
+}
+
+onMounted(load)
+</script>
+
+<style scoped>
+.card {
+  margin-bottom: 16px;
+}
+.kind-tag {
+  margin-left: 8px;
+}
+.nic-detail {
+  margin-bottom: 12px;
+}
+.nic-choice {
+  margin-bottom: 4px;
+}
+.actions {
+  margin-top: 4px;
+}
+</style>

@@ -145,6 +145,23 @@ def test_resolve_discard(client):
     assert device["mgmt_ip"] == "192.168.10.101"  # 保留原值
 
 
+def test_change_history(client):
+    client.post("/api/v1/devices", json=make_push())
+    push = make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+                           "prefix_length": 24})
+    pending_id = client.post("/api/v1/devices", json=push).json()["pending_change_id"]
+    client.post(
+        f"/api/v1/pending-changes/{pending_id}/resolve",
+        json={"field_choices": {"mgmt.ip": "new"}, "nic_choices": {}},
+    )
+
+    r = client.get("/api/v1/change-history", params={"device_id": 1})
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert len(items) == 1
+    assert "mgmt.ip" in items[0]["summary"]
+
+
 def test_delete_device(client):
     client.post("/api/v1/devices", json=make_push())
     r = client.delete("/api/v1/devices/1")
