@@ -159,7 +159,7 @@ def test_change_history(client):
     assert r.status_code == 200
     items = r.json()["items"]
     assert len(items) == 1
-    assert "管理 IP" in items[0]["summary"]
+    assert "mgmt.ip" in items[0]["summary"]
 
 
 def test_delete_device(client):
@@ -249,7 +249,7 @@ def test_history_detail(client):
     )
 
     body = client.get("/api/v1/change-history/1").json()
-    assert body["summary"] == "管理 IP: 192.168.10.101 -> 192.168.10.200"
+    assert body["summary"] == "mgmt.ip: 192.168.10.101 -> 192.168.10.200"
     assert body["diff"]["fields"][0]["field"] == "mgmt.ip"
 
 
