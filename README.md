@@ -28,4 +28,5 @@ uv run pytest tests/ -v
 
 ## 文档
 
+- API 使用文档:[docs/API.md](docs/API.md)
 - 设计与实施计划:[docs/PLAN.md](docs/PLAN.md)
