@@ -1,0 +1,46 @@
+{
+  "hostname": "S1A01DC-VL101",
+  "serial_number": "PF4ABC123456",
+  "mgmt": {
+    "mac": "AA:BB:CC:DD:EE:01",
+    "ip": "192.168.10.101",
+    "prefix_length": 24
+  },
+  "nics": [
+    {
+      "name": "eth0",
+      "mac": "AA:BB:CC:DD:EE:02",
+      "ips": [
+        {
+          "ip": "10.10.1.101",
+          "prefix_length": 24
+        }
+      ]
+    },
+    {
+      "name": "eth1",
+      "mac": "AA:BB:CC:DD:EE:03",
+      "ips": [
+        {
+          "ip": "10.10.2.101",
+          "prefix_length": 24
+        }
+      ]
+    },
+    {
+      "name": "eth2",
+      "mac": "AA:BB:CC:DD:EE:04",
+      "ips": []
+    },
+    {
+      "name": "eth3",
+      "mac": "AA:BB:CC:DD:EE:05",
+      "ips": [
+        {
+          "ip": "10.10.4.101",
+          "prefix_length": 24
+        }
+      ]
+    }
+  ]
+}

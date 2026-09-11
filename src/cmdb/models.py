@@ -7,8 +7,15 @@ from sqlmodel import Field, SQLModel
 
 
 def utcnow() -> datetime:
-    """统一 UTC 时间,避免跨时区计算出错。"""
-    return datetime.now(timezone.utc)
+    """统一 naive UTC 时间(SQLite DATETIME 存取不带 tzinfo)。"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def to_naive_utc(dt: datetime) -> datetime:
+    """归一化为 naive UTC:带时区先转 UTC 再去 tzinfo。"""
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 class Device(SQLModel, table=True):
