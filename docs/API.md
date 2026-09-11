@@ -12,7 +12,9 @@
 - [设备列表 / 详情 / 删除](#2-设备)
 - [待裁决](#3-冲突待裁决)
 - [变更历史](#4-变更历史)
-- [错误码](#5-错误码)
+- [仪表盘](#5-仪表盘)
+- [设备扩展接口](#6-设备扩展接口)
+- [错误码](#7-错误码)
 
 ---
 
@@ -266,15 +268,69 @@ curl "http://192.168.201.18:8080/api/v1/change-history?device_id=1"
       "device_id": 1,
       "summary": "mgmt.ip: 192.168.10.101 -> 192.168.10.200; 网卡 eth1 删除",
       "source": "collector",
+      "diff": {"...": "裁决时的完整差异清单,结构同待裁决 diff"},
       "created_at": "2026-09-11T08:43:57"
     }
   ]
 }
 ```
 
+### `GET /api/v1/change-history/{id}` — 变更详情
+
+含裁决时的完整 diff。
+
 ---
 
-## 5. 错误码
+## 5. 仪表盘
+
+### `GET /api/v1/dashboard`
+
+资产概览统计:总数、活跃/疑似下线、待裁决数、最近 10 条变更。
+
+```bash
+curl "http://192.168.201.18:8080/api/v1/dashboard"
+```
+
+```json
+{
+  "total_devices": 150,
+  "active": 61,
+  "suspected_offline": 89,
+  "pending_changes": 1,
+  "recent_changes": ["...最近变更数组..."]
+}
+```
+
+---
+
+## 6. 设备扩展接口
+
+### `GET /api/v1/devices/export/csv` — 导出 CSV
+
+导出全部设备,UTF-8 BOM(Excel 中文兼容)。`Content-Disposition: attachment`。
+
+### `PUT /api/v1/devices/{id}/tags` — 更新标签
+
+```json
+{"tags": ["生产", "web"]}
+```
+
+全量替换;标签为 CMDB 元数据,不属于采集数据。
+
+### `POST /api/v1/devices/batch-delete` — 批量删除
+
+```json
+{"ids": [1, 2, 3]}
+```
+
+行为同单个删除(硬删,历史保留);返回 `{"deleted": [实际删除的 id]}`。
+
+**列表搜索增强**:`search` 同时覆盖 hostname / serial_number / mgmt_ip /
+网卡业务 IP(按 IP 反查设备);`tag` 参数按标签筛选。
+
+---
+
+## 7. 错误码
 
 | 状态码 | 场景 |
 |---|---|

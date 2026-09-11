@@ -130,6 +130,7 @@ def apply_resolution(
                 device_id=device.id,
                 summary="; ".join(summaries),
                 source=pending.source,
+                diff=pending.diff,
             )
         )
     session.commit()

@@ -30,13 +30,36 @@ def init_db(engine) -> None:
 
 _engine = None
 
+# 轻量迁移:已有表补新列(SQLite ALTER TABLE);新库由 create_all 直接建出
+# 注意表名是 SQLModel 默认的类名小写:device / changehistory
+_MIGRATIONS = {
+    "device": {"tags": "TEXT NOT NULL DEFAULT ''"},
+    "changehistory": {"diff": "JSON"},
+}
+
+
+def migrate(engine) -> None:
+    """检查既有表的列,补缺失的列(幂等)。"""
+    with engine.connect() as conn:
+        for table, cols in _MIGRATIONS.items():
+            existing = {
+                row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")
+            }
+            if not existing:  # 表还不存在,create_all 会带新列建出
+                continue
+            for col, ddl in cols.items():
+                if col not in existing:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+        conn.commit()
+
 
 def get_engine_cached():
-    """进程级单例 engine,首次使用时建表。"""
+    """进程级单例 engine,首次使用时建表 + 迁移。"""
     global _engine
     if _engine is None:
         _engine = make_engine()
         init_db(_engine)
+        migrate(_engine)
     return _engine
 
 

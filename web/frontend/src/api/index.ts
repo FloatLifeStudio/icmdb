@@ -25,6 +25,7 @@ export interface DeviceOut {
   created_at: string
   updated_at: string
   status: string
+  tags: string[]
   nics: NicOut[]
 }
 
@@ -71,6 +72,23 @@ export interface ResolveBody {
   nic_choices: Record<string, string>
 }
 
+export interface DashboardOut {
+  total_devices: number
+  active: number
+  suspected_offline: number
+  pending_changes: number
+  recent_changes: HistoryRow[]
+}
+
+export interface HistoryRow {
+  id: number
+  device_id: number
+  summary: string
+  source: string | null
+  diff: Record<string, unknown> | null
+  created_at: string
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
   if (!res.ok) {
@@ -98,18 +116,39 @@ export const api = {
     page_size?: number
     search?: string
     status?: string
+    tag?: string
+    sort_by?: string
+    sort_order?: string
   }) => {
     const qs = new URLSearchParams()
     if (params.page) qs.set('page', String(params.page))
     if (params.page_size) qs.set('page_size', String(params.page_size))
     if (params.search) qs.set('search', params.search)
     if (params.status) qs.set('status', params.status)
+    if (params.tag) qs.set('tag', params.tag)
+    if (params.sort_by) qs.set('sort_by', params.sort_by)
+    if (params.sort_order) qs.set('sort_order', params.sort_order)
     return request<DeviceListOut>(`${BASE}/devices?${qs}`)
   },
 
   getDevice: (id: number) => request<DeviceOut>(`${BASE}/devices/${id}`),
 
   deleteDevice: (id: number) => request<void>(`${BASE}/devices/${id}`, { method: 'DELETE' }),
+
+  batchDelete: (ids: number[]) =>
+    request<{ deleted: number[] }>(`${BASE}/devices/batch-delete`, json('POST', { ids })),
+
+  updateTags: (id: number, tags: string[]) =>
+    request<{ device_id: number; tags: string[] }>(
+      `${BASE}/devices/${id}/tags`,
+      json('PUT', { tags }),
+    ),
+
+  exportCsvUrl: () => `${BASE}/devices/export/csv`,
+
+  dashboard: () => request<DashboardOut>(`${BASE}/dashboard`),
+
+  getHistoryDetail: (id: number) => request<HistoryRow>(`${BASE}/change-history/${id}`),
 
   listPendingChanges: (status = 'pending') =>
     request<{ items: PendingChange[] }>(`${BASE}/pending-changes?status=${status}`),

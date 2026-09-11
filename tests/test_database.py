@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
+from cmdb.database import make_engine, migrate
 from cmdb.models import Device, Nic, NicIP
 
 
@@ -56,3 +57,32 @@ def test_wal_mode(engine):
     with engine.connect() as conn:
         mode = conn.exec_driver_sql("PRAGMA journal_mode").scalar()
         assert mode == "wal"
+
+
+def test_migrate_adds_missing_columns(tmp_path):
+    """旧库(无 tags/diff 列)迁移后补上新列,已有数据不受影响。"""
+    eng = make_engine(str(tmp_path / "old.db"))
+    with eng.connect() as conn:
+        conn.exec_driver_sql(
+            "CREATE TABLE device (id INTEGER PRIMARY KEY, hostname VARCHAR, "
+            "tags TEXT NOT NULL DEFAULT '')"
+        )
+        conn.exec_driver_sql(
+            "CREATE TABLE changehistory (id INTEGER PRIMARY KEY, device_id INTEGER, "
+            "summary VARCHAR)"
+        )
+        conn.exec_driver_sql("INSERT INTO device (hostname) VALUES ('old-host')")
+        conn.commit()
+
+    migrate(eng)
+    with eng.connect() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(device)")}
+        assert "tags" in cols
+        row = conn.exec_driver_sql(
+            "SELECT hostname, tags FROM device WHERE hostname = 'old-host'"
+        ).fetchone()
+        assert row[0] == "old-host"  # 已有数据保留
+        hcols = {
+            row[1] for row in conn.exec_driver_sql("PRAGMA table_info(changehistory)")
+        }
+        assert "diff" in hcols

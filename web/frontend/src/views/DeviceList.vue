@@ -3,7 +3,7 @@
     <div class="toolbar">
       <el-input
         v-model="search"
-        placeholder="按 hostname 搜索"
+        placeholder="搜索 hostname / 序列号 / IP(反查)"
         clearable
         class="search"
         @input="load"
@@ -18,20 +18,52 @@
         <el-option label="活跃" value="active" />
         <el-option label="疑似下线" value="suspected_offline" />
       </el-select>
+      <el-input
+        v-model="tagFilter"
+        placeholder="按标签筛选(如:生产)"
+        clearable
+        class="filter"
+        @input="load"
+      />
       <el-button type="primary" @click="load">刷新</el-button>
+      <el-button @click="exportCsv">导出 CSV</el-button>
+      <el-popconfirm
+        title="确认批量删除选中的设备?(连带网卡数据,历史保留)"
+        @confirm="batchRemove"
+      >
+        <template #reference>
+          <el-button type="danger" :disabled="!selected.length">批量删除</el-button>
+        </template>
+      </el-popconfirm>
     </div>
 
-    <el-table :data="items" v-loading="loading" border stripe>
+    <el-table
+      :data="items"
+      v-loading="loading"
+      border
+      stripe
+      @sort-change="onSortChange"
+      @selection-change="onSelectionChange"
+    >
+      <el-table-column type="selection" width="45" />
       <el-table-column prop="id" label="ID" width="60" />
-      <el-table-column prop="hostname" label="Hostname" min-width="180">
+      <el-table-column prop="hostname" label="Hostname" min-width="180" sortable="custom">
         <template #default="{ row }">
           <router-link :to="`/devices/${row.id}`" class="link">
             {{ row.hostname }}
           </router-link>
         </template>
       </el-table-column>
-      <el-table-column prop="serial_number" label="序列号" min-width="140" />
-      <el-table-column prop="mgmt_ip" label="管理 IP" min-width="130" />
+      <el-table-column prop="serial_number" label="序列号" min-width="140" sortable="custom" />
+      <el-table-column prop="mgmt_ip" label="管理 IP" min-width="130" sortable="custom" />
+      <el-table-column label="标签" min-width="120">
+        <template #default="{ row }">
+          <el-tag v-for="t in row.tags" :key="t" size="small" class="tag">
+            {{ t }}
+          </el-tag>
+          <span v-if="!row.tags.length">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="110">
         <template #default="{ row }">
           <el-tag :type="row.status === 'active' ? 'success' : 'warning'">
@@ -39,7 +71,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="上次推送" min-width="170">
+      <el-table-column prop="last_pushed_at" label="上次推送" min-width="170" sortable="custom">
         <template #default="{ row }">{{ fmt(row.last_pushed_at) }}</template>
       </el-table-column>
       <el-table-column label="操作" width="100" fixed="right">
@@ -58,11 +90,13 @@
 
     <el-pagination
       v-model:current-page="page"
-      :page-size="pageSize"
+      v-model:page-size="pageSize"
+      :page-sizes="[10, 20, 50, 100, 500, 1000]"
       :total="total"
-      layout="total, prev, pager, next"
+      layout="total, sizes, prev, pager, next"
       class="pagination"
       @current-change="load"
+      @size-change="page = 1; load()"
     />
   </div>
 </template>
@@ -75,10 +109,29 @@ import { api, DeviceOut } from '../api'
 const items = ref<DeviceOut[]>([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = 20
+const pageSize = ref(20)
 const search = ref('')
 const statusFilter = ref('')
+const tagFilter = ref('')
+const sortBy = ref('')
+const sortOrder = ref('')
+const selected = ref<DeviceOut[]>([])
 const loading = ref(false)
+
+function onSortChange({ prop, order }: { prop: string; order: string | null }) {
+  if (order === null) {
+    sortBy.value = ''
+    sortOrder.value = ''
+  } else {
+    sortBy.value = prop
+    sortOrder.value = order === 'ascending' ? 'asc' : 'desc'
+  }
+  load()
+}
+
+function onSelectionChange(rows: DeviceOut[]) {
+  selected.value = rows
+}
 
 function fmt(ts: string | null): string {
   if (!ts) return '-'
@@ -92,9 +145,12 @@ async function load() {
   try {
     const res = await api.listDevices({
       page: page.value,
-      page_size: pageSize,
+      page_size: pageSize.value,
       search: search.value || undefined,
       status: statusFilter.value || undefined,
+      tag: tagFilter.value || undefined,
+      sort_by: sortBy.value || undefined,
+      sort_order: sortOrder.value || undefined,
     })
     items.value = res.items
     total.value = res.total
@@ -115,6 +171,20 @@ async function remove(id: number) {
   }
 }
 
+async function batchRemove() {
+  try {
+    const res = await api.batchDelete(selected.value.map((r) => r.id))
+    ElMessage.success(`已删除 ${res.deleted.length} 台设备`)
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
+}
+
+function exportCsv() {
+  window.open(api.exportCsvUrl())
+}
+
 onMounted(load)
 </script>
 
@@ -123,16 +193,20 @@ onMounted(load)
   display: flex;
   gap: 12px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 .search {
   width: 260px;
 }
 .filter {
-  width: 140px;
+  width: 170px;
 }
 .link {
   color: var(--el-color-primary);
   text-decoration: none;
+}
+.tag {
+  margin-right: 4px;
 }
 .pagination {
   margin-top: 16px;

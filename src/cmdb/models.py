@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Column, UniqueConstraint
+from sqlalchemy import JSON, Column, TEXT, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -28,6 +28,8 @@ class Device(SQLModel, table=True):
     mgmt_ip: str | None = None
     mgmt_prefix_length: int | None = None
     last_pushed_at: datetime | None = None
+    # 逗号分隔的标签(CMDB 元数据,UI 可编辑,不属于采集数据)
+    tags: str = Field(default="", sa_column=Column(TEXT))
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -74,10 +76,12 @@ class ChangeHistory(SQLModel, table=True):
     """变更流水,仅记录裁决生效的改动。
 
     device_id 不设外键:设备硬删后本表记录保留,历史独立于设备存活。
+    diff 存裁决时的完整差异清单,供历史详情查看。
     """
 
     id: int | None = Field(default=None, primary_key=True)
     device_id: int = Field(index=True)
     summary: str
     source: str | None = None
+    diff: dict | None = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=utcnow)

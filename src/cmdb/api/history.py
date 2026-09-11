@@ -1,6 +1,6 @@
-"""变更历史 API:GET 列表(只读)。"""
+"""变更历史 API:GET 列表/详情(只读)。"""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from cmdb.database import get_session
@@ -18,3 +18,12 @@ def list_change_history(
     if device_id is not None:
         query = query.where(ChangeHistory.device_id == device_id)
     return {"items": session.exec(query).all()}
+
+
+@router.get("/{history_id}")
+def get_change_history(history_id: int, session: Session = Depends(get_session)):
+    """变更历史详情:含裁决时的完整 diff。"""
+    record = session.get(ChangeHistory, history_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="history record not found")
+    return record

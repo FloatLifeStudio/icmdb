@@ -73,6 +73,7 @@ class DeviceOut(BaseModel):
     updated_at: datetime
     # 动态计算:active / suspected_offline
     status: str
+    tags: list[str] = []
     nics: list[NicOut] = []
 
 
@@ -93,3 +94,15 @@ class ResolutionIn(BaseModel):
 
     field_choices: dict[str, str] = {}
     nic_choices: dict[str, str] = {}
+
+
+class TagUpdate(BaseModel):
+    """标签更新:全量替换为给定标签列表。"""
+
+    tags: list[str] = []
+
+
+class BatchDeleteIn(BaseModel):
+    """批量删除的设备 id 列表。"""
+
+    ids: list[int]

@@ -170,6 +170,97 @@ def test_delete_device(client):
     assert client.delete("/api/v1/devices/1").status_code == 404
 
 
+def test_list_sort_and_multi_field_search(client):
+    client.post("/api/v1/devices", json=make_push())
+    client.post("/api/v1/devices", json=make_push(
+        hostname="S1B02DC-VL102",
+        serial_number="PF4XYZ654321",
+        mgmt={"mac": "AA:BB:CC:DD:EE:11", "ip": "10.0.0.5", "prefix_length": 24},
+    ))
+
+    # 按管理 IP 倒序
+    r = client.get("/api/v1/devices", params={"sort_by": "mgmt_ip", "sort_order": "desc"})
+    items = r.json()["items"]
+    assert items[0]["mgmt_ip"] > items[-1]["mgmt_ip"]
+
+    # 按管理 IP 升序
+    r = client.get("/api/v1/devices", params={"sort_by": "mgmt_ip", "sort_order": "asc"})
+    items = r.json()["items"]
+    assert items[0]["mgmt_ip"] < items[-1]["mgmt_ip"]
+
+    # 搜索覆盖序列号与管理 IP
+    r = client.get("/api/v1/devices", params={"search": "PF4XYZ"})
+    assert r.json()["total"] == 1
+    r = client.get("/api/v1/devices", params={"search": "10.0.0.5"})
+    assert r.json()["total"] == 1
+
+    # 非白名单字段排序 -> 回退默认 hostname 排序,不报错
+    r = client.get("/api/v1/devices", params={"sort_by": "hostname; DROP TABLE"})
+    assert r.status_code == 200
+
+
+def test_dashboard(client):
+    client.post("/api/v1/devices", json=make_push())
+    body = client.get("/api/v1/dashboard").json()
+    assert body["total_devices"] == 1
+    assert body["active"] == 1
+    assert body["suspected_offline"] == 0
+    assert body["pending_changes"] == 0
+
+
+def test_ip_reverse_search(client):
+    """搜索网卡业务 IP 能反查到设备。"""
+    client.post("/api/v1/devices", json=make_push())
+    r = client.get("/api/v1/devices", params={"search": "10.10.2.101"})
+    assert r.json()["total"] == 1
+    assert r.json()["items"][0]["hostname"] == "S1A01DC-VL101"
+
+
+def test_tags(client):
+    client.post("/api/v1/devices", json=make_push())
+    r = client.put("/api/v1/devices/1/tags", json={"tags": ["生产", "web"]})
+    assert r.json()["tags"] == ["生产", "web"]
+
+    items = client.get("/api/v1/devices").json()["items"]
+    assert items[0]["tags"] == ["生产", "web"]
+
+    r = client.get("/api/v1/devices", params={"tag": "生产"})
+    assert r.json()["total"] == 1
+    r = client.get("/api/v1/devices", params={"tag": "测试"})
+    assert r.json()["total"] == 0
+
+
+def test_batch_delete(client):
+    client.post("/api/v1/devices", json=make_push())
+    client.post("/api/v1/devices", json=make_push(hostname="S1B02DC-VL102"))
+    r = client.post("/api/v1/devices/batch-delete", json={"ids": [1, 2, 999]})
+    assert r.json()["deleted"] == [1, 2]
+    assert client.get("/api/v1/devices").json()["total"] == 0
+
+
+def test_history_detail(client):
+    client.post("/api/v1/devices", json=make_push())
+    push = make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+                           "prefix_length": 24})
+    pending_id = client.post("/api/v1/devices", json=push).json()["pending_change_id"]
+    client.post(
+        f"/api/v1/pending-changes/{pending_id}/resolve",
+        json={"field_choices": {"mgmt.ip": "new"}, "nic_choices": {}},
+    )
+
+    body = client.get("/api/v1/change-history/1").json()
+    assert body["summary"] == "mgmt.ip: 192.168.10.101 -> 192.168.10.200"
+    assert body["diff"]["fields"][0]["field"] == "mgmt.ip"
+
+
+def test_export_csv(client):
+    client.post("/api/v1/devices", json=make_push())
+    r = client.get("/api/v1/devices/export/csv")
+    assert r.status_code == 200
+    assert "S1A01DC-VL101" in r.text
+    assert r.text.lstrip("﻿").startswith("hostname")
+
+
 def test_spa_fallback(client):
     """前端路由刷新回退 index.html;未知 API 路径保持 404。"""
     r = client.get("/devices")
