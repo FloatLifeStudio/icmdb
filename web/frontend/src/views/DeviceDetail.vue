@@ -75,9 +75,15 @@
       </el-table>
     </el-card>
 
-    <el-card class="card">
+    <el-card class="card history-card">
       <template #header>变更历史(裁决生效的改动)</template>
-      <el-table :data="history" border v-loading="historyLoading">
+      <el-table
+        ref="historyTable"
+        :data="history"
+        border
+        v-loading="historyLoading"
+        @row-click="toggleExpand"
+      >
         <el-table-column type="expand" width="40">
           <template #default="{ row }">
             <DiffDetail :diff="row.diff" />
@@ -112,7 +118,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, TableInstance } from 'element-plus'
 import { api, DeviceOut, HistoryRow } from '../api'
 import DiffDetail from '../components/DiffDetail.vue'
 
@@ -124,17 +130,26 @@ const loading = ref(false)
 const historyLoading = ref(false)
 const tagDialogVisible = ref(false)
 const tagInput = ref('')
+const historyTable = ref<TableInstance>()
 
-// 变更内容紧凑概览:字段/网卡条目数,完整明细在展开行
+// 点击行任意位置展开/收起明细
+function toggleExpand(row: HistoryRow) {
+  historyTable.value?.toggleRowExpansion(row)
+}
+
+// 变更内容紧凑概览:改了哪些字段/网卡,完整明细在展开行
 function digest(row: HistoryRow): string {
-  const diff = row.diff as { fields?: unknown[]; nics?: unknown[] } | null
+  const diff = row.diff as
+    | { fields?: unknown[]; nics?: { name: string }[] }
+    | null
   if (!diff) return '-'
   const parts: string[] = []
   const nf = diff.fields?.length ?? 0
-  const nn = diff.nics?.length ?? 0
-  if (nf) parts.push(`字段 ${nf} 项`)
-  if (nn) parts.push(`网卡 ${nn} 块`)
-  return parts.length ? parts.join(' + ') : '-'
+  const nics = diff.nics ?? []
+  if (nf) parts.push(`修改 ${nf} 个字段`)
+  if (nics.length)
+    parts.push(`改动网卡 ${nics.map((n) => n.name).join('、')}`)
+  return parts.length ? parts.join(', ') : '-'
 }
 
 function fmt(ts: string | null): string {
@@ -211,5 +226,8 @@ onMounted(async () => {
 }
 .tag {
   margin-right: 4px;
+}
+.history-card :deep(.el-table__row) {
+  cursor: pointer;
 }
 </style>

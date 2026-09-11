@@ -18,7 +18,12 @@
           </el-button>
         </div>
       </template>
-      <el-table :data="stats?.recent_changes || []" border>
+      <el-table
+        ref="tableRef"
+        :data="stats?.recent_changes || []"
+        border
+        @row-click="toggleExpand"
+      >
         <el-table-column type="expand" width="40">
           <template #default="{ row }">
             <DiffDetail :diff="row.diff" />
@@ -47,23 +52,33 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, TableInstance } from 'element-plus'
 import { api, DashboardOut, HistoryRow } from '../api'
 import DiffDetail from '../components/DiffDetail.vue'
 
 const stats = ref<DashboardOut | null>(null)
 const loading = ref(false)
+const tableRef = ref<TableInstance>()
 
-// 变更内容紧凑概览:字段/网卡条目数,完整明细在展开行
+// 点击行任意位置展开/收起明细(设备列的链接点击除外)
+function toggleExpand(row: HistoryRow, _column: unknown, event: Event) {
+  if ((event.target as HTMLElement).closest('a')) return
+  tableRef.value?.toggleRowExpansion(row)
+}
+
+// 变更内容紧凑概览:改了哪些字段/网卡,完整明细在展开行
 function digest(row: HistoryRow): string {
-  const diff = row.diff as { fields?: unknown[]; nics?: unknown[] } | null
+  const diff = row.diff as
+    | { fields?: unknown[]; nics?: { name: string }[] }
+    | null
   if (!diff) return '-'
   const parts: string[] = []
   const nf = diff.fields?.length ?? 0
-  const nn = diff.nics?.length ?? 0
-  if (nf) parts.push(`字段 ${nf} 项`)
-  if (nn) parts.push(`网卡 ${nn} 块`)
-  return parts.length ? parts.join(' + ') : '-'
+  const nics = diff.nics ?? []
+  if (nf) parts.push(`修改 ${nf} 个字段`)
+  if (nics.length)
+    parts.push(`改动网卡 ${nics.map((n) => n.name).join('、')}`)
+  return parts.length ? parts.join(', ') : '-'
 }
 
 const statCards = computed(() => [
@@ -118,5 +133,8 @@ onMounted(async () => {
 .link {
   color: var(--el-color-primary);
   text-decoration: none;
+}
+:deep(.el-table__row) {
+  cursor: pointer;
 }
 </style>
