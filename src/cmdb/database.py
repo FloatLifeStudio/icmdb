@@ -1,7 +1,7 @@
 """SQLite 连接与建表(WAL 模式)。"""
 
 from sqlalchemy import event
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine
 
 from cmdb.config import settings
 
@@ -26,3 +26,21 @@ def make_engine(db_path: str | None = None):
 def init_db(engine) -> None:
     """建表(幂等)。"""
     SQLModel.metadata.create_all(engine)
+
+
+_engine = None
+
+
+def get_engine_cached():
+    """进程级单例 engine,首次使用时建表。"""
+    global _engine
+    if _engine is None:
+        _engine = make_engine()
+        init_db(_engine)
+    return _engine
+
+
+def get_session():
+    """FastAPI 依赖:每个请求一个 Session。"""
+    with Session(get_engine_cached()) as session:
+        yield session
