@@ -146,6 +146,8 @@ export const api = {
 
   exportCsvUrl: () => `${BASE}/devices/export/csv`,
 
+  importCsvUrl: () => `${BASE}/devices/import/csv`,
+
   dashboard: () => request<DashboardOut>(`${BASE}/dashboard`),
 
   getHistoryDetail: (id: number) => request<HistoryRow>(`${BASE}/change-history/${id}`),

@@ -261,6 +261,83 @@ def test_export_csv(client):
     assert r.text.lstrip("﻿").startswith("hostname")
 
 
+def test_import_csv_roundtrip(client):
+    """导出的 CSV 直接回导 -> unchanged(格式与导出一致)。"""
+    client.post("/api/v1/devices", json=make_push())
+    csv_content = client.get("/api/v1/devices/export/csv").text
+
+    r = client.post(
+        "/api/v1/devices/import/csv",
+        files={"file": ("devices.csv", csv_content.encode("utf-8"), "text/csv")},
+    )
+    body = r.json()
+    assert body["unchanged"] == 1
+    assert body["created"] == 0
+
+
+def test_import_csv_creates_devices(client):
+    csv_content = (
+        "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
+        "tags,status,last_pushed_at,nics\n"
+        'S1C03DC-VL103,PF4IMP111111,AA:BB:CC:00:00:01,192.168.30.103,24,'
+        '生产,active,2026-09-11T10:00:00,'
+        '"eth0(AA:BB:CC:00:00:02): 10.10.3.103/24"\n'
+    )
+    r = client.post(
+        "/api/v1/devices/import/csv",
+        files={"file": ("devices.csv", csv_content.encode("utf-8"), "text/csv")},
+    )
+    body = r.json()
+    assert body["created"] == 1
+
+    # 设备 + 标签 + 网卡 IP 已导入
+    detail = client.get("/api/v1/devices/1").json()
+    assert detail["hostname"] == "S1C03DC-VL103"
+    assert detail["tags"] == ["生产"]
+    assert detail["nics"][0]["ips"][0]["ip"] == "10.10.3.103"
+
+    # IP 反查能找到导入的设备
+    r = client.get("/api/v1/devices", params={"search": "10.10.3.103"})
+    assert r.json()["total"] == 1
+
+
+def test_import_csv_conflict_goes_to_pending(client):
+    client.post("/api/v1/devices", json=make_push())
+    csv_content = (
+        "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
+        "tags,status,last_pushed_at,nics\n"
+        "S1A01DC-VL101,PF4ABC123456,AA:BB:CC:DD:EE:01,192.168.10.200,24,,active,,\n"
+    )
+    r = client.post(
+        "/api/v1/devices/import/csv",
+        files={"file": ("devices.csv", csv_content.encode("utf-8"), "text/csv")},
+    )
+    body = r.json()
+    assert body["diff_created"] == 1
+
+    # 现有数据未变,pending 生成
+    assert client.get("/api/v1/devices/1").json()["mgmt_ip"] == "192.168.10.101"
+    pendings = client.get("/api/v1/pending-changes").json()["items"]
+    assert len(pendings) == 1
+    assert pendings[0]["source"] == "csv_import"
+
+
+def test_import_csv_skips_malformed_rows(client):
+    csv_content = (
+        "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
+        "tags,status,last_pushed_at,nics\n"
+        ",no-hostname-here,,,,active,,\n"
+        "S1C03DC-VL103,PF4IMP111111,AA:BB:CC:00:00:01,192.168.30.103,24,,active,,\n"
+    )
+    r = client.post(
+        "/api/v1/devices/import/csv",
+        files={"file": ("devices.csv", csv_content.encode("utf-8"), "text/csv")},
+    )
+    body = r.json()
+    assert body["created"] == 1
+    assert len(body["errors"]) == 0  # 缺 hostname 的行直接跳过
+
+
 def test_spa_fallback(client):
     """前端路由刷新回退 index.html;未知 API 路径保持 404。"""
     r = client.get("/devices")

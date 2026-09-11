@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "sqlmodel>=0.0.22",
     "pydantic>=2.9",
+    "python-multipart>=0.0.32",
 ]
 
 [dependency-groups]
@@ -22,6 +23,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cmdb"]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

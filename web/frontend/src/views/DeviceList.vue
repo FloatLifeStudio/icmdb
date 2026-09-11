@@ -27,6 +27,14 @@
       />
       <el-button type="primary" @click="load">刷新</el-button>
       <el-button @click="exportCsv">导出 CSV</el-button>
+      <el-upload
+        :show-file-list="false"
+        :auto-upload="false"
+        accept=".csv"
+        :on-change="importCsv"
+      >
+        <el-button>导入 CSV</el-button>
+      </el-upload>
       <el-popconfirm
         title="确认批量删除选中的设备?(连带网卡数据,历史保留)"
         @confirm="batchRemove"
@@ -183,6 +191,22 @@ async function batchRemove() {
 
 function exportCsv() {
   window.open(api.exportCsvUrl())
+}
+
+async function importCsv(upload: { raw: File }) {
+  const fd = new FormData()
+  fd.append('file', upload.raw)
+  try {
+    const res = await fetch(api.importCsvUrl(), { method: 'POST', body: fd })
+    const body = await res.json()
+    if (!res.ok) throw new Error(body.detail || res.statusText)
+    ElMessage.success(
+      `导入完成:新增 ${body.created},未变化 ${body.unchanged},进待裁决 ${body.diff_created}`
+    )
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
 }
 
 onMounted(load)

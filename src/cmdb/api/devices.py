@@ -1,10 +1,11 @@
-"""设备 API:POST 推送、GET 列表/详情/导出/批量删除、标签更新、DELETE。"""
+"""设备 API:POST 推送、GET 列表/详情/导出/批量删除、标签更新、CSV 导入、DELETE。"""
 
 import csv
 import io
+import re
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import or_
 from sqlmodel import Session, select
 
@@ -16,8 +17,11 @@ from cmdb.schemas import (
     DeviceCreatedOut,
     DeviceOut,
     DevicePush,
+    MgmtInfo,
+    NicIn,
     NicIPOut,
     NicOut,
+    NicIPIn,
     TagUpdate,
 )
 from cmdb.services.ingest import ingest_push
@@ -250,3 +254,76 @@ def export_csv(session: Session = Depends(get_session)):
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=devices.csv"},
     )
+
+
+def _nics_from_csv(nics_str: str | None) -> list[NicIn]:
+    """解析导出格式的 nics 列:"eth0(MAC): ip/24, ip/24 | eth1(MAC): ..."。"""
+    nics: list[NicIn] = []
+    if not nics_str:
+        return nics
+    for part in nics_str.split(" | "):
+        m = re.match(r"^(.+?)\((.*?)\):\s*(.*)$", part.strip())
+        if not m:
+            continue
+        name, mac, ip_str = m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
+        ips: list[NicIPIn] = []
+        for ip in filter(None, (p.strip() for p in ip_str.split(","))):
+            if ip == "-":
+                continue
+            if "/" in ip:
+                addr, prefix = ip.split("/", 1)
+                ips.append(NicIPIn(ip=addr, prefix_length=int(prefix)))
+            else:
+                ips.append(NicIPIn(ip=ip))
+        nics.append(NicIn(name=name, mac=mac or None, ips=ips))
+    return nics
+
+
+@router.post("/import/csv")
+async def import_csv(
+    file: UploadFile = File(...), session: Session = Depends(get_session)
+):
+    """CSV 批量导入:逐行走与推送相同的清洗逻辑(hostname 匹配、diff 进待裁决)。
+
+    行格式与导出一致,可直接回导;source 标记为 csv_import。
+    """
+    text = (await file.read()).decode("utf-8-sig")  # 兼容 BOM
+    reader = csv.DictReader(io.StringIO(text))
+    summary = {"created": 0, "unchanged": 0, "diff_created": 0, "errors": []}
+
+    for row in reader:
+        hostname = (row.get("hostname") or "").strip()
+        if not hostname:
+            continue
+        push = DevicePush(
+            hostname=hostname,
+            serial_number=row.get("serial_number") or None,
+            mgmt=MgmtInfo(
+                mac=row.get("mgmt_mac") or None,
+                ip=row.get("mgmt_ip") or None,
+                prefix_length=(
+                    int(row["mgmt_prefix_length"])
+                    if row.get("mgmt_prefix_length")
+                    else None
+                ),
+            ),
+            nics=_nics_from_csv(row.get("nics")),
+            timestamp=row.get("last_pushed_at") or None,
+            full_sync=True,  # CSV 代表设备全量状态
+            source="csv_import",
+        )
+        result = ingest_push(session, push, utcnow())
+        summary[result["result"]] += 1
+
+        # 标签随导入设置(CMDB 元数据,不走推送清洗)
+        tags = _split_tags(row.get("tags"))
+        if tags:
+            device = session.exec(
+                select(Device).where(Device.hostname == hostname)
+            ).first()
+            if device is not None:
+                device.tags = ",".join(tags)
+                session.add(device)
+
+    session.commit()
+    return summary

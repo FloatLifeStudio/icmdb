@@ -309,6 +309,24 @@ curl "http://192.168.201.18:8080/api/v1/dashboard"
 
 导出全部设备,UTF-8 BOM(Excel 中文兼容)。`Content-Disposition: attachment`。
 
+### `POST /api/v1/devices/import/csv` — CSV 导入
+
+`multipart/form-data` 上传,字段名 `file`,行格式与导出一致(可直接回导)。
+
+```bash
+curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
+  -F "file=@devices.csv"
+```
+
+**行为**:逐行走与推送相同的清洗逻辑(hostname 匹配、diff 进待裁决),
+`source` 标记为 `csv_import`;标签随导入设置。
+
+```json
+{"created": 1, "unchanged": 0, "diff_created": 0, "errors": []}
+```
+
+`errors` 为解析失败(缺 hostname 等)的行说明,不影响其余行导入。
+
 ### `PUT /api/v1/devices/{id}/tags` — 更新标签
 
 ```json
