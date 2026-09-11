@@ -1,0 +1,30 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- SQLite 数据库 ----
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ---- 前端 ----
+node_modules/
+web/frontend/dist/
+src/cmdb/static/
+
+# ---- 环境与本地配置 ----
+.env
+.env.*
+
+# ---- IDE / 工具 ----
+.claude/
+.idea/
+.vscode/
+*.swp
+.DS_Store
