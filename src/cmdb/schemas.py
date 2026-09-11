@@ -83,3 +83,13 @@ class DeviceCreatedOut(BaseModel):
     device_id: int
     # diff_created 时返回待裁决记录 id
     pending_change_id: int | None = None
+
+
+class ResolutionIn(BaseModel):
+    """裁决请求体:每条 diff 条目选 "new"(采用新数据)或 "old"(保留现状)。
+
+    对 removed 网卡,"new" 即删除该网卡。
+    """
+
+    field_choices: dict[str, str] = {}
+    nic_choices: dict[str, str] = {}

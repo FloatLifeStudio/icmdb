@@ -71,10 +71,13 @@ class PendingChange(SQLModel, table=True):
 
 
 class ChangeHistory(SQLModel, table=True):
-    """变更流水,仅记录裁决生效的改动;设备硬删后本表记录保留。"""
+    """变更流水,仅记录裁决生效的改动。
+
+    device_id 不设外键:设备硬删后本表记录保留,历史独立于设备存活。
+    """
 
     id: int | None = Field(default=None, primary_key=True)
-    device_id: int = Field(foreign_key="device.id", index=True)
+    device_id: int = Field(index=True)
     summary: str
     source: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
