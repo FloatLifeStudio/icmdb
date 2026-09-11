@@ -101,7 +101,10 @@ const loading = ref(false)
 const historyLoading = ref(false)
 
 function fmt(ts: string | null): string {
-  return ts ? new Date(ts).toLocaleString() : '-'
+  if (!ts) return '-'
+  // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
+  const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z'
+  return new Date(utc).toLocaleString()
 }
 
 async function load() {
