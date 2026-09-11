@@ -102,8 +102,11 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices \
 |---|---|---|
 | `page` | 1 | 页码 |
 | `page_size` | 20 | 每页数量 |
-| `search` | - | hostname 模糊搜索 |
+| `search` | - | 模糊搜索,覆盖 hostname / serial_number / mgmt_ip / 网卡业务 IP(反查) |
 | `status` | - | `active` / `suspected_offline`,按推送阈值在 SQL 层筛选 |
+| `tag` | - | 按标签筛选 |
+| `sort_by` | - | 排序字段,白名单:`hostname` / `serial_number` / `mgmt_ip` / `last_pushed_at` |
+| `sort_order` | `asc` | `asc` / `desc` |
 
 ```bash
 curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
@@ -297,7 +300,7 @@ curl "http://192.168.201.18:8080/api/v1/dashboard"
   "active": 61,
   "suspected_offline": 89,
   "pending_changes": 1,
-  "recent_changes": ["...最近变更数组..."]
+  "recent_changes": ["...最近 10 条变更,条目结构同变更历史(含 summary / diff)..."]
 }
 ```
 
