@@ -168,3 +168,16 @@ def test_delete_device(client):
     assert r.status_code == 204
     assert client.get("/api/v1/devices/1").status_code == 404
     assert client.delete("/api/v1/devices/1").status_code == 404
+
+
+def test_spa_fallback(client):
+    """前端路由刷新回退 index.html;未知 API 路径保持 404。"""
+    r = client.get("/devices")
+    assert r.status_code == 200
+    assert '<div id="app">' in r.text
+
+    r = client.get("/conflicts")
+    assert r.status_code == 200
+
+    r = client.get("/api/v1/nonexistent")
+    assert r.status_code == 404
