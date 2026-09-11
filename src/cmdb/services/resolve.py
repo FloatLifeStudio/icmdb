@@ -23,6 +23,19 @@ _FIELD_ATTRS = {
     "mgmt.prefix_length": "mgmt_prefix_length",
 }
 
+# 主机字段路径 -> 人类可读名称(用于变更摘要)
+_FIELD_LABELS = {
+    "hostname": "主机名",
+    "serial_number": "序列号",
+    "mgmt.mac": "管理 MAC",
+    "mgmt.ip": "管理 IP",
+    "mgmt.prefix_length": "子网前缀",
+}
+
+
+def _field_label(field: str) -> str:
+    return _FIELD_LABELS.get(field, field)
+
 
 def _apply_nic(session: Session, device: Device, entry: dict) -> None:
     """按裁决结果处理单个网卡条目(kind=added/removed/changed,选择已过滤为 new)。"""
@@ -95,7 +108,9 @@ def apply_resolution(
         if attr is None:
             continue
         setattr(device, attr, entry["new"])
-        summaries.append(f"{entry['field']}: {entry['old']} -> {entry['new']}")
+        summaries.append(
+            f"{_field_label(entry['field'])}: {entry['old']} -> {entry['new']}"
+        )
 
     for entry in pending.diff.get("nics", []):
         choice = nic_choices.get(entry["name"])
@@ -109,13 +124,11 @@ def apply_resolution(
             for change in entry.get("changes", []):
                 if change["field"] == "mac":
                     summaries.append(
-                        f"网卡 {entry['name']} mac: {change['old']} -> {change['new']}"
+                        f"网卡 {entry['name']} MAC: {change['old']} -> {change['new']}"
                     )
                 elif change["field"] == "ips":
-                    summaries.append(
-                        f"网卡 {entry['name']} ips 变更为 "
-                        f"{[ip['ip'] for ip in change['new']]}"
-                    )
+                    ips = ", ".join(ip["ip"] for ip in change["new"])
+                    summaries.append(f"网卡 {entry['name']} IP 列表变更为 {ips}")
         _apply_nic(session, device, entry)
 
     pending.status = "applied"

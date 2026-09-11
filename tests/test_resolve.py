@@ -50,7 +50,7 @@ def test_apply_field_choice_new(engine):
         )
         result = apply_resolution(session, pending, {"mgmt.ip": "new"}, {})
 
-        assert result["applied"] == ["mgmt.ip: 192.168.10.101 -> 192.168.10.200"]
+        assert result["applied"] == ["管理 IP: 192.168.10.101 -> 192.168.10.200"]
         device = session.get(Device, pending.device_id)
         assert device.mgmt_ip == "192.168.10.200"  # 新值生效
         assert device.serial_number == "PF4ABC123456"  # 未选择的保持不变
@@ -58,7 +58,7 @@ def test_apply_field_choice_new(engine):
         assert pending.resolved_at is not None
         histories = session.exec(select(ChangeHistory)).all()
         assert len(histories) == 1
-        assert histories[0].summary == "mgmt.ip: 192.168.10.101 -> 192.168.10.200"
+        assert histories[0].summary == "管理 IP: 192.168.10.101 -> 192.168.10.200"
         assert histories[0].source == "collector"
 
 

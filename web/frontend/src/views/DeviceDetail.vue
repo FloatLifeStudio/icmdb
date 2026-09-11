@@ -81,7 +81,9 @@
         <el-table-column prop="created_at" label="时间" min-width="170">
           <template #default="{ row }">{{ fmt(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column prop="summary" label="变更内容" min-width="300" />
+        <el-table-column label="变更内容" min-width="300">
+          <template #default="{ row }">{{ fmtSummary(row.summary) }}</template>
+        </el-table-column>
         <el-table-column prop="source" label="来源" width="120">
           <template #default="{ row }">{{ row.source || '-' }}</template>
         </el-table-column>
@@ -116,7 +118,9 @@
         <template v-if="diffRow.diff">
           <h4>主机字段</h4>
           <el-table :data="diffRow.diff.fields" border size="small">
-            <el-table-column prop="field" label="字段" min-width="120" />
+            <el-table-column label="字段" min-width="120">
+              <template #default="{ row }">{{ fieldLabel(row.field) }}</template>
+            </el-table-column>
             <el-table-column label="旧值" min-width="140">
               <template #default="{ row }">{{ row.old ?? '-' }}</template>
             </el-table-column>
@@ -133,7 +137,7 @@
             <el-table-column label="变化" min-width="260">
               <template #default="{ row }">
                 <div v-for="(c, i) in row.changes" :key="i">
-                  {{ c.field }}: {{ fmtChange(c) }}
+                  {{ fieldLabel(c.field) }}: {{ fmtChange(c) }}
                 </div>
                 <span v-if="!row.changes.length">-</span>
               </template>
@@ -167,6 +171,31 @@ const kindLabel: Record<string, string> = {
   added: '新增',
   removed: '候删',
   changed: '有变化',
+}
+
+// 主机字段路径 -> 人类可读名称
+const fieldLabels: Record<string, string> = {
+  hostname: '主机名',
+  serial_number: '序列号',
+  mgmt_mac: '管理 MAC',
+  mgmt_ip: '管理 IP',
+  mgmt_prefix_length: '子网前缀',
+  mac: 'MAC',
+  ips: 'IP 列表',
+}
+function fieldLabel(f: string): string {
+  return fieldLabels[f] ?? f
+}
+
+// 变更摘要兼容旧记录:字段路径替换为中文(新记录后端已直接输出中文)
+function fmtSummary(s: string): string {
+  return s
+    .replace(/mgmt\.mac/g, '管理 MAC')
+    .replace(/mgmt\.ip/g, '管理 IP')
+    .replace(/mgmt_prefix_length/g, '子网前缀')
+    .replace(/serial_number/g, '序列号')
+    .replace(/mac:/g, 'MAC:')
+    .replace(/ips/g, 'IP 列表')
 }
 
 function fmt(ts: string | null): string {

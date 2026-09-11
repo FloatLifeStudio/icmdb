@@ -26,7 +26,9 @@
         <el-card class="card">
           <template #header>主机字段差异(设备 #{{ pending.device_id }})</template>
           <el-table :data="pending.diff.fields" border>
-            <el-table-column prop="field" label="字段" min-width="140" />
+            <el-table-column label="字段" min-width="140">
+              <template #default="{ row }">{{ fieldLabel(row.field) }}</template>
+            </el-table-column>
             <el-table-column label="旧值(库中)" min-width="180">
               <template #default="{ row }">{{ row.old ?? '-' }}</template>
             </el-table-column>
@@ -62,7 +64,7 @@
             <el-descriptions-item
               v-for="(change, i) in entry.changes"
               :key="i"
-              :label="change.field"
+              :label="fieldLabel(change.field)"
             >
               {{ fmtChange(change) }}
             </el-descriptions-item>
@@ -120,6 +122,20 @@ const kindLabel: Record<string, string> = {
   added: '新增',
   removed: '候删',
   changed: '有变化',
+}
+
+// 主机字段路径 -> 人类可读名称
+const fieldLabels: Record<string, string> = {
+  hostname: '主机名',
+  serial_number: '序列号',
+  mgmt_mac: '管理 MAC',
+  mgmt_ip: '管理 IP',
+  mgmt_prefix_length: '子网前缀',
+  mac: 'MAC',
+  ips: 'IP 列表',
+}
+function fieldLabel(f: string): string {
+  return fieldLabels[f] ?? f
 }
 const kindTag: Record<string, string> = {
   added: 'success',
