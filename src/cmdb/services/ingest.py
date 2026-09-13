@@ -18,7 +18,7 @@ from cmdb.models import (
     to_naive_utc,
 )
 from cmdb.schemas import DevicePush
-from cmdb.services.diff import diff_push, merge_diff
+from cmdb.services.diff import diff_push
 
 
 def build_snapshot(session: Session, device: Device) -> dict:
@@ -196,7 +196,11 @@ def _create_nic(session: Session, device_id: int, nic) -> None:
 def _merge_into_pending(
     session: Session, device: Device, push: DevicePush, diff: dict
 ) -> PendingChange:
-    """合并进该设备已有的 pending(始终一条),否则新建。"""
+    """挂到该设备已有的 pending(始终一条),否则新建。
+
+    已有 pending 未裁决时以最新一次推送为准:直接用新推送算出的 diff
+    整体替换(库中数据在裁决前不动,重算即最新视角),不与旧 diff 累计。
+    """
     pending = session.exec(
         select(PendingChange).where(
             PendingChange.device_id == device.id,
@@ -212,7 +216,7 @@ def _merge_into_pending(
             diff=diff,
         )
     else:
-        pending.diff = merge_diff(pending.diff, diff)
+        pending.diff = diff
         pending.payload = push.model_dump(mode="json")
         pending.source = push.agent.source or pending.source
 

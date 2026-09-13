@@ -1,7 +1,7 @@
 """字段级 diff 服务测试。"""
 
 from cmdb.schemas import DevicePush, MgmtInfo, NicIPIn, NicIn
-from cmdb.services.diff import diff_push, merge_diff
+from cmdb.services.diff import diff_push
 
 
 def make_push(**overrides) -> DevicePush:
@@ -149,27 +149,3 @@ def test_nic_removed_only_with_full_sync():
     assert diff["has_changes"] is False
 
 
-def test_merge_diff_newest_wins():
-    existing = {
-        "fields": [{"field": "mgmt.ip", "old": "a", "new": "b"}],
-        "nics": [{"name": "eth3", "kind": "added", "changes": [],
-                  "old": None, "new": {"name": "eth3"}}],
-        "has_changes": True,
-    }
-    new = {
-        "fields": [{"field": "mgmt.ip", "old": "a", "new": "c"},
-                   {"field": "serial_number", "old": "x", "new": "y"}],
-        "nics": [{"name": "eth3", "kind": "removed", "changes": [],
-                  "old": {"name": "eth3"}, "new": None}],
-        "has_changes": True,
-    }
-    merged = merge_diff(existing, new)
-    # 同字段以最新推送为准
-    mgmt_ip = next(f for f in merged["fields"] if f["field"] == "mgmt.ip")
-    assert mgmt_ip["new"] == "c"
-    # 新条目追加
-    assert any(f["field"] == "serial_number" for f in merged["fields"])
-    # removed 覆盖 added
-    eth3 = next(n for n in merged["nics"] if n["name"] == "eth3")
-    assert eth3["kind"] == "removed"
-    assert merged["has_changes"] is True

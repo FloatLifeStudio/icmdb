@@ -105,7 +105,8 @@ def test_diff_created_branch(engine):
         ]
 
 
-def test_conflict_pushes_merge_into_one_pending(engine):
+def test_conflict_pushes_replace_with_latest(engine):
+    """多次冲突推送未裁决:以最新一次推送的 diff 为准,不累计。"""
     with Session(engine) as session:
         ingest_push(session, make_push(), RECEIVED_AT)
         first = ingest_push(
@@ -122,14 +123,46 @@ def test_conflict_pushes_merge_into_one_pending(engine):
 
         assert first["result"] == "diff_created"
         assert second["result"] == "diff_created"
-        # 合并进同一条 pending
+        # 仍是同一条 pending
         assert second["pending_change_id"] == first["pending_change_id"]
         pendings = session.exec(select(PendingChange)).all()
         assert len(pendings) == 1
         diff = pendings[0].diff
+        # 整体替换:只剩最新一次推送的差异(mgmt.ip 已回到库中值,不再待裁决)
         fields = {f["field"]: f for f in diff["fields"]}
-        assert fields["mgmt.ip"]["new"] == "192.168.10.200"
         assert fields["hardware.chassis_serial_number"]["new"] == "PF4ABC999999"
+        assert "mgmt.ip" not in fields
+
+
+def test_gpu_added_replaced_by_latest_push(engine):
+    """第一次推 2 块 GPU,未裁决又推 2 块不同 UUID 的 GPU:待裁决以最后一次为准。"""
+    with Session(engine) as session:
+        ingest_push(session, make_push(), RECEIVED_AT)
+        first = ingest_push(
+            session,
+            make_push(gpus=[
+                {"uuid": "GPU-aaa", "name": "A1"},
+                {"uuid": "GPU-bbb", "name": "B1"},
+            ]),
+            RECEIVED_AT,
+        )
+        second = ingest_push(
+            session,
+            make_push(gpus=[
+                {"uuid": "GPU-ccc", "name": "C1"},
+                {"uuid": "GPU-ddd", "name": "D1"},
+            ]),
+            RECEIVED_AT,
+        )
+
+        assert first["result"] == "diff_created"
+        assert second["result"] == "diff_created"
+        assert second["pending_change_id"] == first["pending_change_id"]
+        pendings = session.exec(select(PendingChange)).all()
+        assert len(pendings) == 1
+        uuids = {g["uuid"] for g in pendings[0].diff["gpus"]}
+        # 只保留最新一次推送的 2 块,不累计成 4 块
+        assert uuids == {"GPU-ccc", "GPU-ddd"}
 
 
 def test_full_sync_removed_nic_in_diff(engine):
