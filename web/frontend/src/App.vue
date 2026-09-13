@@ -73,9 +73,9 @@ provide('refreshPendingCount', loadPendingCount)
   flex: 1;
 }
 .menu-badge :deep(.el-badge__content) {
-  position: static;
-  transform: none;
-  margin-left: 4px;
+  /* 恢复默认角标定位:贴在文字右上角 */
+  position: absolute;
+  transform: translateY(-50%) translateX(100%);
 }
 .main {
   background: var(--el-bg-color-page);
