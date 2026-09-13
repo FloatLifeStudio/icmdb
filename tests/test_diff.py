@@ -108,6 +108,13 @@ def test_nic_changed_mac():
     assert eth0["changes"] == [
         {"field": "mac", "old": "AA:BB:CC:DD:EE:02", "new": "AA:BB:CC:DD:EE:99"}
     ]
+    # changed 条目带整体旧/新表示,前端两列对比用
+    assert eth0["old"] == {
+        "name": "eth0",
+        "mac": "AA:BB:CC:DD:EE:02",
+        "ips": [{"ip": "10.10.1.101", "prefix_length": 24}],
+    }
+    assert eth0["new"]["mac"] == "AA:BB:CC:DD:EE:99"
 
 
 def test_nic_changed_ips():

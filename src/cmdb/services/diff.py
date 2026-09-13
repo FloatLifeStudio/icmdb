@@ -140,7 +140,17 @@ def _nics_diff(
 
         if changes:
             entries.append(
-                {"name": nic.name, "kind": "changed", "changes": changes}
+                {
+                    "name": nic.name,
+                    "kind": "changed",
+                    "changes": changes,
+                    "old": {
+                        "name": nic.name,
+                        "mac": old.get("mac"),
+                        "ips": old_ips,
+                    },
+                    "new": _nic_repr(nic),
+                }
             )
 
     if full_sync:
@@ -209,7 +219,15 @@ def _memory_diff(
             if new != old.get(field):
                 changes.append({"field": field, "old": old.get(field), "new": new})
         if changes:
-            entries.append({"slot": mem.slot, "kind": "changed", "changes": changes})
+            entries.append(
+                {
+                    "slot": mem.slot,
+                    "kind": "changed",
+                    "changes": changes,
+                    "old": old,
+                    "new": _memory_repr(mem),
+                }
+            )
 
     if full_sync:
         for slot, old in sorted(snapshot_memory.items()):
@@ -259,6 +277,8 @@ def _cpu_diff(
                     "changes": [
                         {"field": "model", "old": old.get("model"), "new": cpu.model}
                     ],
+                    "old": old,
+                    "new": {"slot": cpu.slot, "model": cpu.model},
                 }
             )
 
@@ -324,7 +344,20 @@ def _disk_diff(
                 changes.append({"field": field, "old": old.get(field), "new": new})
         if changes:
             entries.append(
-                {"serial_number": disk.serial_number, "kind": "changed", "changes": changes}
+                {
+                    "serial_number": disk.serial_number,
+                    "kind": "changed",
+                    "changes": changes,
+                    "old": old,
+                    "new": {
+                        "serial_number": disk.serial_number,
+                        "type": disk.type,
+                        "manufacturer": disk.manufacturer,
+                        "model": disk.model,
+                        "size": disk.size,
+                        "size_unit": disk.size_unit,
+                    },
+                }
             )
 
     if full_sync:
@@ -385,7 +418,18 @@ def _psu_diff(
                 changes.append({"field": field, "old": old.get(field), "new": new})
         if changes:
             entries.append(
-                {"serial_number": psu.serial_number, "kind": "changed", "changes": changes}
+                {
+                    "serial_number": psu.serial_number,
+                    "kind": "changed",
+                    "changes": changes,
+                    "old": old,
+                    "new": {
+                        "serial_number": psu.serial_number,
+                        "manufacturer": psu.manufacturer,
+                        "model": psu.model,
+                        "max_power_w": psu.max_power_w,
+                    },
+                }
             )
 
     if full_sync:
@@ -444,7 +488,13 @@ def _gpu_diff(
                 changes.append({"field": field, "old": old.get(field), "new": new})
         if changes:
             entries.append(
-                {"uuid": gpu.uuid, "kind": "changed", "changes": changes}
+                {
+                    "uuid": gpu.uuid,
+                    "kind": "changed",
+                    "changes": changes,
+                    "old": old,
+                    "new": _gpu_repr(gpu),
+                }
             )
 
     if full_sync:

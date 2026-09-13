@@ -418,13 +418,22 @@ function cpuRepr(c: Record<string, unknown>): string {
 // 旧值/新值两列对比:added 的旧值与 removed 的新值不存在,显示 -
 function partContent(
   reprFn: (o: Record<string, unknown>) => string,
-  entry: { kind: string; old: unknown; new: unknown },
+  entry: {
+    kind: string
+    old: unknown
+    new: unknown
+    changes?: { field: string; old: unknown; new: unknown }[]
+  },
   which: 'old' | 'new',
 ): string {
   if (which === 'old' && entry.kind === 'added') return '-'
   if (which === 'new' && entry.kind === 'removed') return '-'
   const obj = (which === 'old' ? entry.old : entry.new) as Record<string, unknown> | null
-  return reprFn(obj ?? {})
+  if (obj) return reprFn(obj)
+  // 已存 diff 的 changed 条目没有整体 old/new,从逐字段 changes 回溯
+  const built: Record<string, unknown> = {}
+  for (const c of entry.changes ?? []) built[c.field] = which === 'old' ? c.old : c.new
+  return reprFn(built)
 }
 
 function fmt(ts: string): string {
