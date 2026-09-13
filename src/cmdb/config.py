@@ -17,6 +17,13 @@ class Settings:
         self.static_dir: str = os.getenv(
             "CMDB_STATIC_DIR", "src/cmdb/static"
         )
+        # 单管理员账号(UI 登录用;推送接口不鉴权,采集器无需改造)
+        self.admin_user: str = os.getenv("CMDB_ADMIN_USER", "admin")
+        self.admin_password: str = os.getenv("CMDB_ADMIN_PASSWORD", "admin")
+        # 会话 cookie 签名密钥(改密钥即全员下线)
+        self.secret_key: str = os.getenv("CMDB_SECRET_KEY", "cmdb-session-secret")
+        # 会话有效期(天)
+        self.session_expire_days: int = int(os.getenv("CMDB_SESSION_EXPIRE_DAYS", "7"))
 
 
 settings = Settings()

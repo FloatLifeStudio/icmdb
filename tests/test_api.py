@@ -537,3 +537,34 @@ def test_push_disk_and_psu_end_to_end(client):
 
     body = client.get(f"/api/v1/devices/{device_id}").json()
     assert body["disks"][0]["model"] == "990PRO"
+
+
+def test_push_open_without_login(guest):
+    """推送接口不鉴权:采集器无需登录即可推送。"""
+    r = guest.post("/api/v1/devices", json=make_push())
+    assert r.status_code == 200
+    assert r.json()["result"] == "created"
+
+
+def test_api_requires_login(guest):
+    """未登录时除推送外的 API 返回 401。"""
+    assert guest.get("/api/v1/devices").status_code == 401
+    assert guest.get("/api/v1/dashboard").status_code == 401
+    assert guest.get("/api/v1/pending-changes").status_code == 401
+    assert guest.get("/api/v1/auth/me").json()["detail"] == "未登录"
+
+
+def test_login_flow(guest):
+    """登录成功签发会话 cookie,可访问受保护接口;错误密码 401。"""
+    r = guest.post("/api/v1/auth/login", json={"username": "admin", "password": "wrong"})
+    assert r.status_code == 401
+    assert guest.get("/api/v1/devices").status_code == 401
+
+    r = guest.post("/api/v1/auth/login", json={"username": "admin", "password": "admin"})
+    assert r.status_code == 200
+    # TestClient 自动携带上一步签发的会话 cookie
+    assert guest.get("/api/v1/devices").status_code == 200
+    assert guest.get("/api/v1/auth/me").json()["username"] == "admin"
+
+    guest.post("/api/v1/auth/logout")
+    assert guest.get("/api/v1/devices").status_code == 401

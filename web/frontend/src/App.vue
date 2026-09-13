@@ -1,5 +1,8 @@
 <template>
-  <el-container class="layout">
+  <el-container v-if="$route.path === '/login'" class="bare">
+    <router-view />
+  </el-container>
+  <el-container v-else class="layout">
     <el-aside width="200px" class="aside">
       <div class="logo" title="回到首页" @click="$router.push('/dashboard')">CMDB</div>
       <el-menu router :default-active="$route.path" class="menu">
@@ -17,6 +20,10 @@
           </span>
         </el-menu-item>
       </el-menu>
+      <div class="user">
+        <span class="username">{{ username }}</span>
+        <el-button link type="primary" @click="logout">退出</el-button>
+      </div>
     </el-aside>
     <el-main class="main">
       <router-view />
@@ -32,6 +39,7 @@ import { api } from './api'
 
 const route = useRoute()
 const pendingCount = ref(0)
+const username = ref('')
 
 // 待裁决数量气泡:进入应用、切换页面时刷新(裁决提交后由 ConflictResolve 调 loadPendingCount)
 async function loadPendingCount() {
@@ -43,8 +51,27 @@ async function loadPendingCount() {
   }
 }
 
+// 当前登录用户(顶栏展示);未登录静默
+async function loadUsername() {
+  try {
+    const res = await api.me()
+    username.value = res.username
+  } catch {
+    // 静默失败
+  }
+}
+
+async function logout() {
+  try {
+    await api.logout()
+  } finally {
+    window.location.href = '/login'
+  }
+}
+
 watch(() => route.path, loadPendingCount)
 loadPendingCount()
+loadUsername()
 provide('refreshPendingCount', loadPendingCount)
 </script>
 
@@ -53,6 +80,7 @@ provide('refreshPendingCount', loadPendingCount)
   min-height: 100vh;
 }
 .aside {
+  position: relative;
   border-right: 1px solid var(--el-border-color-light);
 }
 .logo {
@@ -80,5 +108,20 @@ provide('refreshPendingCount', loadPendingCount)
 }
 .main {
   background: var(--el-bg-color-page);
+}
+.bare {
+  min-height: 100vh;
+}
+.user {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.username {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 </style>

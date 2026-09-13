@@ -176,6 +176,14 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
+    // 会话失效:除登录/会话检查外,401 统一跳登录页
+    if (
+      res.status === 401 &&
+      !url.startsWith(`${BASE}/auth/`) &&
+      !window.location.pathname.startsWith('/login')
+    ) {
+      window.location.href = '/login'
+    }
     throw new Error(body.detail || res.statusText)
   }
   if (res.status === 204) return undefined as T
@@ -246,4 +254,11 @@ export const api = {
       `${BASE}/pending-changes/${id}/resolve`,
       json('POST', body),
     ),
+
+  login: (username: string, password: string) =>
+    request<{ username: string }>(`${BASE}/auth/login`, json('POST', { username, password })),
+
+  logout: () => request<{ ok: boolean }>(`${BASE}/auth/logout`, json('POST', {})),
+
+  me: () => request<{ username: string }>(`${BASE}/auth/me`),
 }

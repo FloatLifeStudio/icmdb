@@ -4,9 +4,12 @@ import tomllib
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from cmdb.api.auth import SESSION_COOKIE, verify_token
+from cmdb.api.auth import router as auth_router
 from cmdb.api.dashboard import router as dashboard_router
 from cmdb.api.devices import router as devices_router
 from cmdb.api.history import router as history_router
@@ -46,6 +49,23 @@ def create_app() -> FastAPI:
     app.include_router(pending_changes_router, prefix="/api/v1")
     app.include_router(history_router, prefix="/api/v1")
     app.include_router(dashboard_router, prefix="/api/v1")
+    app.include_router(auth_router, prefix="/api/v1")
+
+    # 会话拦截:/api/v1 除推送(采集器无需登录)与登录/会话检查外均要求登录;
+    # 静态资源(登录页本身)不拦截,由前端路由守卫跳转
+    exempt = {
+        ("/api/v1/devices", "POST"),
+        ("/api/v1/auth/login", "POST"),
+        ("/api/v1/auth/me", "GET"),
+    }
+
+    @app.middleware("http")
+    async def _auth_middleware(request, call_next):
+        path = request.url.path
+        if path.startswith("/api/v1") and (path, request.method) not in exempt:
+            if not verify_token(request.cookies.get(SESSION_COOKIE)):
+                return JSONResponse({"detail": "未登录"}, status_code=401)
+        return await call_next(request)
 
     # 前端构建产物由 FastAPI 托管,单服务单端口;目录不存在(纯后端 dev)时跳过
     static_dir = Path(settings.static_dir)

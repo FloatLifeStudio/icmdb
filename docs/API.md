@@ -1,8 +1,9 @@
 # CMDB API 使用文档
 
 > Base URL: `http://<host>:8080/api/v1`
-> 响应格式:REST 风格,HTTP 状态码 + JSON body,无鉴权
-> 采集推送(POST /devices)是唯一的数据写入入口
+> 响应格式:REST 风格,HTTP 状态码 + JSON body
+> 采集推送(POST /devices)是唯一的数据写入入口,**且不要求登录**(采集器无需改造)
+> 其余 API 要求登录(会话 cookie),登录接口见[用户登录](#8-用户登录)
 > 时间戳:响应中的时间统一为 naive UTC(无时区后缀),客户端应按 UTC 解析后
 > 转换为查看者本地时区显示,如 JS:`new Date(ts + 'Z')`
 > 完整推送示例见 [EXAMPLE.md](./EXAMPLE.md)
@@ -16,6 +17,7 @@
 - [仪表盘](#5-仪表盘)
 - [设备扩展接口](#6-设备扩展接口)
 - [错误码](#7-错误码)
+- [用户登录](#8-用户登录)
 
 ---
 
@@ -433,11 +435,36 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 
 | 状态码 | 场景 |
 |---|---|
-| 422 | 请求体校验失败(如缺 hostname) |
+| 401 | 未登录或密码错误(推送接口除外) |
 | 404 | 设备 / 待裁决记录不存在 |
 | 409 | 待裁决记录已被处理过,重复裁决 |
+| 422 | 请求体校验失败(如缺 hostname) |
 
 错误响应:`{"detail": "..."}`(FastAPI 校验错误为 `{"detail": [...]}`)。
+
+## 8. 用户登录
+
+单管理员账号,凭据由环境变量配置:`CMDB_ADMIN_USER` / `CMDB_ADMIN_PASSWORD`
+(默认 `admin` / `admin`)。登录后签发 HttpOnly 会话 cookie(HMAC 签名,
+默认 7 天,`CMDB_SESSION_EXPIRE_DAYS` 可配),后续请求自动携带。
+
+**登录范围**:仅 UI 及其调用的 API;`POST /api/v1/devices`(采集推送)保持开放。
+
+### `POST /api/v1/auth/login`
+
+```json
+{"username": "admin", "password": "admin"}
+```
+
+成功返回 `{"username": "admin"}` 并设置会话 cookie;失败返回 401。
+
+### `POST /api/v1/auth/logout`
+
+清除会话 cookie,返回 `{"ok": true}`。
+
+### `GET /api/v1/auth/me`
+
+返回当前登录用户 `{"username": "admin"}`;未登录返回 401(UI 用它判断会话状态)。
 
 ## 附:配置项(环境变量)
 
@@ -446,3 +473,7 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 | `CMDB_DB_PATH` | `cmdb.db` | SQLite 数据库文件路径 |
 | `CMDB_OFFLINE_THRESHOLD_DAYS` | `3` | 疑似下线阈值(天) |
 | `CMDB_STATIC_DIR` | `src/cmdb/static` | 前端构建产物目录 |
+| `CMDB_ADMIN_USER` | `admin` | 登录用户名 |
+| `CMDB_ADMIN_PASSWORD` | `admin` | 登录密码 |
+| `CMDB_SECRET_KEY` | `cmdb-session-secret` | 会话 cookie 签名密钥 |
+| `CMDB_SESSION_EXPIRE_DAYS` | `7` | 会话有效期(天) |
