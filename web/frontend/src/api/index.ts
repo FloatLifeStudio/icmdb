@@ -39,6 +39,7 @@ export interface Disk {
   model: string | null
   size: number | null
   size_unit: string | null
+  size_gb: number | null
 }
 
 export interface Psu {

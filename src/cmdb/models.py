@@ -95,8 +95,18 @@ class Cpu(SQLModel, table=True):
     model: str | None = None
 
 
+def normalized_size_gb(size: int | None, size_unit: str | None) -> int | None:
+    """容量归一化为 GB(理论标称值):TB 按 1024 换算,其余按 GB。"""
+    if size is None:
+        return None
+    return size * 1024 if (size_unit or "").upper() == "TB" else size
+
+
 class Disk(SQLModel, table=True):
-    """硬盘表,serial_number 为身份(device 内唯一),type 为 SSD / HDD。"""
+    """硬盘表,serial_number 为身份(device 内唯一),type 为 SSD / HDD。
+
+    size + size_unit 为标称容量原始值;size_gb 为归一化数值列,便于排序与统计。
+    """
 
     __table_args__ = (UniqueConstraint("device_id", "serial_number"),)
 
@@ -108,6 +118,7 @@ class Disk(SQLModel, table=True):
     model: str | None = None
     size: int | None = None
     size_unit: str | None = None
+    size_gb: int | None = None
 
 
 class Psu(SQLModel, table=True):
@@ -151,4 +162,4 @@ class ChangeHistory(SQLModel, table=True):
     summary: str
     source: str | None = None
     diff: dict | None = Field(default=None, sa_column=Column(JSON))
-    created_at: datetime = Field(default_factory=utcnow)
+    created_at: datetime = Field(default_factory=utcnow, index=True)

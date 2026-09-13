@@ -221,7 +221,7 @@ def _to_out(session: Session, device: Device, children: _Children | None = None)
             DiskOut(
                 id=d.id, serial_number=d.serial_number, type=d.type,
                 manufacturer=d.manufacturer, model=d.model,
-                size=d.size, size_unit=d.size_unit,
+                size=d.size, size_unit=d.size_unit, size_gb=d.size_gb,
             )
             for d in children["disks"].get(device.id, [])
         ],

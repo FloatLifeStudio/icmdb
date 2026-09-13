@@ -250,6 +250,21 @@ def test_import_csv_preserves_last_pushed_at(client):
     assert after == original
 
 
+def test_disk_size_gb_normalized(client):
+    """推送硬盘时 size_gb 归一化:TB 按 1024 换算,GB 原值。"""
+    push = make_push(
+        disks=[
+            {"serial_number": "S1", "type": "SSD", "size": 512, "size_unit": "GB"},
+            {"serial_number": "S2", "type": "HDD", "size": 8, "size_unit": "TB"},
+        ]
+    )
+    client.post("/api/v1/devices", json=push)
+    detail = client.get("/api/v1/devices/1").json()
+    sizes = {d["serial_number"]: d["size_gb"] for d in detail["disks"]}
+    assert sizes["S1"] == 512
+    assert sizes["S2"] == 8192
+
+
 def test_batch_delete(client):
     client.post("/api/v1/devices", json=make_push())
     client.post("/api/v1/devices", json=make_push(hostname="S1B02DC-VL102"))

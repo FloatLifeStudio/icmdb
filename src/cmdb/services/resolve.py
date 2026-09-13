@@ -23,6 +23,7 @@ from cmdb.models import (
     NicIP,
     PendingChange,
     Psu,
+    normalized_size_gb,
     utcnow,
 )
 
@@ -141,6 +142,7 @@ def _apply_disk(session: Session, device: Device, entry: dict) -> None:
                 model=new.get("model"),
                 size=new.get("size"),
                 size_unit=new.get("size_unit"),
+                size_gb=normalized_size_gb(new.get("size"), new.get("size_unit")),
             )
         )
         return
@@ -157,6 +159,9 @@ def _apply_disk(session: Session, device: Device, entry: dict) -> None:
     for change in entry.get("changes", []):
         if change["field"] in _DISK_FIELDS:
             setattr(existing, change["field"], change["new"])
+    # 容量归一化列随 size/size_unit 变化重算
+    if existing.size is not None:
+        existing.size_gb = normalized_size_gb(existing.size, existing.size_unit)
 
 
 def _apply_psu(session: Session, device: Device, entry: dict) -> None:

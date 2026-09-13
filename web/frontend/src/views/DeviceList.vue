@@ -6,7 +6,7 @@
         placeholder="搜索 hostname / 序列号 / IP(反查)"
         clearable
         class="search"
-        @input="load"
+        @input="debouncedLoad"
       />
       <el-select
         v-model="statusFilter"
@@ -23,7 +23,7 @@
         placeholder="按标签筛选(精确匹配)"
         clearable
         class="filter"
-        @input="load"
+        @input="debouncedLoad"
       />
       <el-button type="primary" @click="load">刷新</el-button>
       <el-button @click="exportCsv">导出 CSV</el-button>
@@ -143,6 +143,13 @@ function onSelectionChange(rows: DeviceOut[]) {
   selected.value = rows
 }
 
+// 输入防抖:停止输入 300ms 后再发请求
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+function debouncedLoad() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(load, 300)
+}
+
 function fmt(ts: string | null): string {
   if (!ts) return '-'
   // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
@@ -164,6 +171,12 @@ async function load() {
     })
     items.value = res.items
     total.value = res.total
+    // 当前页删空时回退到第一页,避免停在空页
+    if (!res.items.length && page.value > 1) {
+      page.value = 1
+      await load()
+      return
+    }
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {

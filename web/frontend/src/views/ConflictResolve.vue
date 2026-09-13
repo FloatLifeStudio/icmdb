@@ -217,6 +217,7 @@
           <el-button type="primary" :loading="resolving" @click="submit">
             提交裁决
           </el-button>
+          <el-button @click="keepAllOld">全部保留旧值</el-button>
         </div>
         <el-empty
           v-else
@@ -391,6 +392,21 @@ function selectPending(row: PendingChange | null) {
     for (const p of row.diff.psus ?? [])
       if (p.serial_number) psuChoices.value[p.serial_number] = 'new'
   }
+}
+
+// 一键全部保留旧值(不采用任何新数据,提交后仅标记 applied)
+function keepAllOld() {
+  if (!pending.value) return
+  for (const f of pending.value.diff.fields) fieldChoices.value[f.field] = 'old'
+  for (const n of pending.value.diff.nics) nicChoices.value[n.name] = 'old'
+  for (const m of pending.value.diff.memory ?? [])
+    if (m.slot) memoryChoices.value[m.slot] = 'old'
+  for (const c of pending.value.diff.cpus ?? []) if (c.slot) cpuChoices.value[c.slot] = 'old'
+  for (const d of pending.value.diff.disks ?? [])
+    if (d.serial_number) diskChoices.value[d.serial_number] = 'old'
+  for (const p of pending.value.diff.psus ?? [])
+    if (p.serial_number) psuChoices.value[p.serial_number] = 'old'
+  ElMessage.info('已全部选择保留旧值,可直接提交')
 }
 
 async function submit() {

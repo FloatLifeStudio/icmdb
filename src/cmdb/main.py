@@ -1,5 +1,6 @@
 """FastAPI app 工厂:/api 路由挂载 + 前端静态托管。"""
 
+import tomllib
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,6 +12,19 @@ from cmdb.api.devices import router as devices_router
 from cmdb.api.history import router as history_router
 from cmdb.api.pending_changes import router as pending_changes_router
 from cmdb.config import settings
+
+
+def _version() -> str:
+    """从 pyproject.toml 读版本号,读不到回退 unknown。"""
+    for parent in Path(__file__).parents:
+        pyproject = parent / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                with open(pyproject, "rb") as f:
+                    return tomllib.load(f)["project"]["version"]
+            except Exception:
+                break
+    return "unknown"
 
 
 class SPAStaticFiles(StaticFiles):
@@ -27,7 +41,7 @@ class SPAStaticFiles(StaticFiles):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="CMDB", version="2.0.0")
+    app = FastAPI(title="CMDB", version=_version())
     app.include_router(devices_router, prefix="/api/v1")
     app.include_router(pending_changes_router, prefix="/api/v1")
     app.include_router(history_router, prefix="/api/v1")

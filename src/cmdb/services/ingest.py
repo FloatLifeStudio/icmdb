@@ -13,6 +13,7 @@ from cmdb.models import (
     NicIP,
     PendingChange,
     Psu,
+    normalized_size_gb,
     to_naive_utc,
 )
 from cmdb.schemas import DevicePush
@@ -60,6 +61,7 @@ def build_snapshot(session: Session, device: Device) -> dict:
             "model": disk.model,
             "size": disk.size,
             "size_unit": disk.size_unit,
+            "size_gb": disk.size_gb,
         }
     for psu in session.exec(select(Psu).where(Psu.device_id == device.id)):
         snapshot["psus"][psu.serial_number] = {
@@ -142,7 +144,9 @@ def _create_device(session: Session, push: DevicePush, received_at: datetime) ->
             session.add(Cpu(device_id=device.id, **cpu.model_dump()))
     if push.disks:
         for disk in push.disks:
-            session.add(Disk(device_id=device.id, **disk.model_dump()))
+            data = disk.model_dump()
+            data["size_gb"] = normalized_size_gb(disk.size, disk.size_unit)
+            session.add(Disk(device_id=device.id, **data))
     if push.psus:
         for psu in push.psus:
             session.add(Psu(device_id=device.id, **psu.model_dump()))

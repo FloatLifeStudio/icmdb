@@ -50,6 +50,14 @@ def migrate(engine) -> None:
                 if col not in existing:
                     conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
         _migrate_tags_column(conn)
+        _migrate_disk_size(conn)
+        # 存量表补索引(SQLModel create_all 不会给已存在的表加索引)
+        hcols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(changehistory)")}
+        if hcols and "created_at" in hcols:
+            conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_changehistory_created_at "
+                "ON changehistory (created_at)"
+            )
         conn.commit()
 
 
@@ -72,6 +80,18 @@ def _migrate_tags_column(conn) -> None:
                     (device_id, name),
                 )
     conn.exec_driver_sql("ALTER TABLE device DROP COLUMN tags")
+
+
+def _migrate_disk_size(conn) -> None:
+    """旧 disk 表补 size_gb 归一化列并回填(TB 按 1024 换算)。"""
+    cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(disk)")}
+    if "size_gb" in cols or not cols:  # 新库由 create_all 带出;表不存在则跳过
+        return
+    conn.exec_driver_sql("ALTER TABLE disk ADD COLUMN size_gb INTEGER")
+    conn.exec_driver_sql(
+        "UPDATE disk SET size_gb = CASE "
+        "WHEN UPPER(size_unit) = 'TB' THEN size * 1024 ELSE size END"
+    )
 
 
 def get_engine_cached():

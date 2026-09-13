@@ -112,9 +112,10 @@ class CpuSlotOut(CpuSlotIn):
 
 
 class DiskOut(DiskIn):
-    """响应中的硬盘(含 id)。"""
+    """响应中的硬盘(含 id 与归一化容量)。"""
 
     id: int
+    size_gb: int | None = None
 
 
 class PsuOut(PsuIn):
