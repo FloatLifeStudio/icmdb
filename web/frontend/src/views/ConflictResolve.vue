@@ -59,8 +59,11 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="变更内容" min-width="280">
-              <template #default="{ row }">{{ nicContent(row) }}</template>
+            <el-table-column label="旧值(库中)" min-width="200">
+              <template #default="{ row }">{{ partContent(nicRepr, row, 'old') }}</template>
+            </el-table-column>
+            <el-table-column label="新值(推送)" min-width="200">
+              <template #default="{ row }">{{ partContent(nicRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column label="裁决" width="220">
               <template #default="{ row }">
@@ -86,8 +89,11 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="变更内容" min-width="280">
-              <template #default="{ row }">{{ partContent(memoryRepr, row) }}</template>
+            <el-table-column label="旧值(库中)" min-width="200">
+              <template #default="{ row }">{{ partContent(memoryRepr, row, 'old') }}</template>
+            </el-table-column>
+            <el-table-column label="新值(推送)" min-width="200">
+              <template #default="{ row }">{{ partContent(memoryRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column label="裁决" width="220">
               <template #default="{ row }">
@@ -113,8 +119,11 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="变更内容" min-width="280">
-              <template #default="{ row }">{{ partContent(cpuRepr, row) }}</template>
+            <el-table-column label="旧值(库中)" min-width="200">
+              <template #default="{ row }">{{ partContent(cpuRepr, row, 'old') }}</template>
+            </el-table-column>
+            <el-table-column label="新值(推送)" min-width="200">
+              <template #default="{ row }">{{ partContent(cpuRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column label="裁决" width="220">
               <template #default="{ row }">
@@ -140,8 +149,11 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="变更内容" min-width="280">
-              <template #default="{ row }">{{ partContent(diskRepr, row) }}</template>
+            <el-table-column label="旧值(库中)" min-width="200">
+              <template #default="{ row }">{{ partContent(diskRepr, row, 'old') }}</template>
+            </el-table-column>
+            <el-table-column label="新值(推送)" min-width="200">
+              <template #default="{ row }">{{ partContent(diskRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column label="裁决" width="220">
               <template #default="{ row }">
@@ -170,8 +182,11 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="变更内容" min-width="280">
-              <template #default="{ row }">{{ partContent(psuRepr, row) }}</template>
+            <el-table-column label="旧值(库中)" min-width="200">
+              <template #default="{ row }">{{ partContent(psuRepr, row, 'old') }}</template>
+            </el-table-column>
+            <el-table-column label="新值(推送)" min-width="200">
+              <template #default="{ row }">{{ partContent(psuRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column label="裁决" width="220">
               <template #default="{ row }">
@@ -200,8 +215,11 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="变更内容" min-width="280">
-              <template #default="{ row }">{{ partContent(gpuRepr, row) }}</template>
+            <el-table-column label="旧值(库中)" min-width="200">
+              <template #default="{ row }">{{ partContent(gpuRepr, row, 'old') }}</template>
+            </el-table-column>
+            <el-table-column label="新值(推送)" min-width="200">
+              <template #default="{ row }">{{ partContent(gpuRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column label="裁决" width="220">
               <template #default="{ row }">
@@ -238,7 +256,7 @@
 <script setup lang="ts">
 import { inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, TableInstance } from 'element-plus'
-import { api, NicDiff, PendingChange } from '../api'
+import { api, PendingChange } from '../api'
 
 // 裁决提交成功后通知侧边栏气泡立即刷新
 const refreshPendingCount = inject<() => void>('refreshPendingCount', () => {})
@@ -397,29 +415,16 @@ function cpuRepr(c: Record<string, unknown>): string {
   return String(c.model ?? '-')
 }
 
-// 行内变更摘要:added/removed 显示完整状态,changed 逐字段列出
-function nicContent(entry: NicDiff): string {
-  if (entry.kind === 'added') return `新增 ${nicRepr(entry.new ?? {})}`
-  if (entry.kind === 'removed') return `删除 ${nicRepr(entry.old ?? {})}`
-  return entry.changes.map((c) => `${fieldLabel(c.field)}: ${fmtChange(c)}`).join('; ')
-}
-
+// 旧值/新值两列对比:added 的旧值与 removed 的新值不存在,显示 -
 function partContent(
   reprFn: (o: Record<string, unknown>) => string,
-  entry: {
-    kind: string
-    old: unknown
-    new: unknown
-    changes: { field: string; old: unknown; new: unknown }[]
-  },
+  entry: { kind: string; old: unknown; new: unknown },
+  which: 'old' | 'new',
 ): string {
-  if (entry.kind === 'added') {
-    return `新增 ${reprFn((entry.new as Record<string, unknown>) ?? {})}`
-  }
-  if (entry.kind === 'removed') {
-    return `删除 ${reprFn((entry.old as Record<string, unknown>) ?? {})}`
-  }
-  return entry.changes.map((c) => `${c.field}: ${c.old} -> ${c.new}`).join('; ')
+  if (which === 'old' && entry.kind === 'added') return '-'
+  if (which === 'new' && entry.kind === 'removed') return '-'
+  const obj = (which === 'old' ? entry.old : entry.new) as Record<string, unknown> | null
+  return reprFn(obj ?? {})
 }
 
 function fmt(ts: string): string {
@@ -433,15 +438,6 @@ function nicRepr(nic: Record<string, unknown>): string {
   const ips = (nic.ips as { ip: string; prefix_length: number | null }[]) || []
   const ipStr = ips.map((i) => i.ip + (i.prefix_length ? '/' + i.prefix_length : ''))
   return `${nic.name}(${mac}),IP: ${ipStr.length ? ipStr.join(', ') : '无'}`
-}
-
-function fmtChange(change: { field: string; old: unknown; new: unknown }): string {
-  if (change.field === 'ips') {
-    const ips = (v: unknown) =>
-      ((v as { ip: string }[]) || []).map((i) => i.ip).join(', ') || '无'
-    return `IP: ${ips(change.old)} -> ${ips(change.new)}`
-  }
-  return `${change.old} -> ${change.new}`
 }
 
 async function load() {
