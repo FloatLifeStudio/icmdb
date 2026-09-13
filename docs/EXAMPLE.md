@@ -36,6 +36,11 @@
         "name": "eth1",
         "mac": "AA:BB:CC:DD:EE:03",
         "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
+      },
+      {
+        "name": "eth2",
+        "mac": "AA:BB:CC:DD:EE:04",
+        "ips": [{"ip": "10.10.3.101", "prefix_length": 24}]
       }
     ],
     "memory": {
@@ -74,11 +79,20 @@
     },
     "cpus": [
       {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
-      {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
+      {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"},
+      {"slot": "CPU2", "model": "Intel(R) Xeon(R) Gold 6448Y"}
     ],
     "disks": [
       {
         "serial_number": "123123123",
+        "type": "SSD",
+        "manufacturer": "Samsung",
+        "model": "990EVO",
+        "size": 8,
+        "size_unit": "TB"
+      },
+      {
+        "serial_number": "123123124",
         "type": "SSD",
         "manufacturer": "Samsung",
         "model": "990EVO",
@@ -106,6 +120,12 @@
         "manufacturer": "GreatWall",
         "model": "CRPS2700D2",
         "max_power_w": 2700
+      },
+      {
+        "serial_number": "2P0123123134",
+        "manufacturer": "GreatWall",
+        "model": "CRPS2700D2",
+        "max_power_w": 2700
       }
     ],
     "gpu": {
@@ -118,6 +138,24 @@
           "size_unit": "GB",
           "driver_version": "550.54.14",
           "pcie_id": "0000:3b:00.0"
+        },
+        {
+          "uuid": "GPU-5a4b3c2d-1e6f-4a5b-8c9d-0e1f2a3b4c5d",
+          "name": "NVIDIA GeForce RTX 4090",
+          "serial_number": "G123457",
+          "size": 24,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:5c:00.0"
+        },
+        {
+          "uuid": "GPU-7c8d9e0f-1a2b-4c3d-8e5f-6a7b8c9d0e1f",
+          "name": "NVIDIA A100-SXM4-80GB",
+          "serial_number": "G123458",
+          "size": 80,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:8d:00.0"
         }
       ]
     }
