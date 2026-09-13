@@ -5,7 +5,8 @@ import io
 import re
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, Body, File, HTTPException, Response, UploadFile
+from pydantic import ValidationError
 from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
@@ -16,6 +17,7 @@ from cmdb.models import (
     Device,
     DeviceTag,
     Disk,
+    Gpu,
     MemorySlot,
     Nic,
     NicIP,
@@ -24,20 +26,27 @@ from cmdb.models import (
     utcnow,
 )
 from cmdb.schemas import (
+    AgentInfo,
     BatchDeleteIn,
     CpuSlotOut,
     DeviceCreatedOut,
     DeviceOut,
     DevicePush,
     DiskOut,
+    GpuOut,
+    GpuSlotIn,
+    GpuInfo,
+    HardwareInfo,
     MgmtInfo,
     MemorySlotOut,
     NicIn,
     NicIPOut,
     NicOut,
     NicIPIn,
+    OsInfo,
     PsuOut,
     TagUpdate,
+    normalise_legacy,
 )
 from cmdb.services.ingest import ingest_push
 
@@ -72,7 +81,7 @@ def _load_children(session: Session, device_ids: list[int]) -> _Children:
     """
     if not device_ids:
         return {"nics": {}, "ips": {}, "memory": {}, "cpus": {}, "disks": {},
-                "psus": {}, "tags": {}}
+                "psus": {}, "gpus": {}, "tags": {}}
 
     nics = session.exec(
         select(Nic).where(Nic.device_id.in_(device_ids))
@@ -89,6 +98,7 @@ def _load_children(session: Session, device_ids: list[int]) -> _Children:
         "cpus": {},
         "disks": {},
         "psus": {},
+        "gpus": {},
         "tags": {},
     }
     for nic in nics:
@@ -105,6 +115,8 @@ def _load_children(session: Session, device_ids: list[int]) -> _Children:
         children["disks"].setdefault(row.device_id, []).append(row)
     for row in session.exec(select(Psu).where(Psu.device_id.in_(device_ids))).all():
         children["psus"].setdefault(row.device_id, []).append(row)
+    for row in session.exec(select(Gpu).where(Gpu.device_id.in_(device_ids))).all():
+        children["gpus"].setdefault(row.device_id, []).append(row)
     for row in session.exec(
         select(DeviceTag)
         .where(DeviceTag.device_id.in_(device_ids))
@@ -169,6 +181,8 @@ def _delete_device_children(session: Session, device_id: int) -> None:
         session.delete(disk)
     for psu in session.exec(select(Psu).where(Psu.device_id == device_id)).all():
         session.delete(psu)
+    for gpu in session.exec(select(Gpu).where(Gpu.device_id == device_id)).all():
+        session.delete(gpu)
     session.flush()
 
 
@@ -196,6 +210,10 @@ def _to_out(session: Session, device: Device, children: _Children | None = None)
         id=device.id,
         hostname=device.hostname,
         serial_number=device.serial_number,
+        os_type=device.os_type,
+        os_version=device.os_version,
+        kernel=device.kernel,
+        agent_version=device.agent_version,
         mgmt_mac=device.mgmt_mac,
         mgmt_ip=device.mgmt_ip,
         mgmt_prefix_length=device.mgmt_prefix_length,
@@ -208,7 +226,8 @@ def _to_out(session: Session, device: Device, children: _Children | None = None)
         memory=[
             MemorySlotOut(
                 id=m.id, slot=m.slot, manufacturer=m.manufacturer,
-                part_number=m.part_number, type=m.type, size_gb=m.size_gb,
+                part_number=m.part_number, type=m.type,
+                size=m.size, size_unit=m.size_unit, size_gb=m.size_gb,
                 speed_mts=m.speed_mts, serial_number=m.serial_number,
             )
             for m in children["memory"].get(device.id, [])
@@ -233,12 +252,28 @@ def _to_out(session: Session, device: Device, children: _Children | None = None)
             )
             for p in children["psus"].get(device.id, [])
         ],
+        gpus=[
+            GpuOut(
+                id=g.id, uuid=g.uuid, name=g.name,
+                serial_number=g.serial_number,
+                size=g.size, size_unit=g.size_unit, size_gb=g.size_gb,
+                driver_version=g.driver_version, pcie_id=g.pcie_id,
+            )
+            for g in children["gpus"].get(device.id, [])
+        ],
     )
 
 
 @router.post("")
-def push_device(push: DevicePush, session: Session = Depends(get_session)):
-    """采集推送(唯一数据写入入口)。"""
+def push_device(payload: dict = Body(...), session: Session = Depends(get_session)):
+    """采集推送(唯一数据写入入口)。
+
+    新格式:agent + os + mgmt + hardware;旧格式(顶层 hostname 等)自动转换。
+    """
+    try:
+        push = DevicePush(**normalise_legacy(payload))
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors())
     result = ingest_push(session, push, utcnow())
     return DeviceCreatedOut(**result)
 
@@ -366,8 +401,9 @@ def export_csv(session: Session = Depends(get_session)):
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(
-        ["hostname", "serial_number", "mgmt_mac", "mgmt_ip", "mgmt_prefix_length",
-         "tags", "status", "last_pushed_at", "nics"]
+        ["hostname", "serial_number", "os_type", "os_version", "kernel",
+         "agent_version", "mgmt_mac", "mgmt_ip", "mgmt_prefix_length",
+         "tags", "status", "last_pushed_at", "nics", "gpu"]
     )
     for d in session.exec(select(Device).order_by(Device.hostname)).all():
         nics = session.exec(select(Nic).where(Nic.device_id == d.id)).all()
@@ -378,10 +414,22 @@ def export_csv(session: Session = Depends(get_session)):
                 i.ip + (f"/{i.prefix_length}" if i.prefix_length else "") for i in ips
             )
             nic_parts.append(f"{nic.name}({nic.mac or '-'}): {ip_str or '-'}")
+        gpus = session.exec(select(Gpu).where(Gpu.device_id == d.id)).all()
+        gpu_parts = []
+        for g in gpus:
+            size_str = f"{g.size}{g.size_unit}" if g.size else "-"
+            gpu_parts.append(
+                f"{g.name or '-'}({g.uuid}): {size_str}, "
+                f"driver {g.driver_version or '-'}, pcie {g.pcie_id or '-'}"
+            )
         writer.writerow(
             [
                 d.hostname,
                 d.serial_number or "",
+                d.os_type or "",
+                d.os_version or "",
+                d.kernel or "",
+                d.agent_version or "",
                 d.mgmt_mac or "",
                 d.mgmt_ip or "",
                 d.mgmt_prefix_length if d.mgmt_prefix_length is not None else "",
@@ -389,6 +437,7 @@ def export_csv(session: Session = Depends(get_session)):
                 _device_status(d),
                 d.last_pushed_at.isoformat() if d.last_pushed_at else "",
                 " | ".join(nic_parts),
+                " | ".join(gpu_parts),
             ]
         )
     content = "\ufeff" + buf.getvalue()  # UTF-8 BOM,Excel 中文兼容
@@ -422,6 +471,41 @@ def _nics_from_csv(nics_str: str | None) -> list[NicIn]:
     return nics
 
 
+def _gpus_from_csv(gpus_str: str | None) -> list[GpuSlotIn]:
+    """解析导出格式的 gpu 列:"name(uuid): 80GB, driver 535.183.01, pcie 0000:1B:00.0"。"""
+    gpus: list[GpuSlotIn] = []
+    if not gpus_str:
+        return gpus
+    for part in gpus_str.split(" | "):
+        m = re.match(r"^(.+?)\((.+?)\):\s*(.*)$", part.strip())
+        if not m:
+            continue
+        name, uuid_, rest = m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
+        size = size_unit = driver = pcie = None
+        for token in rest.split(","):
+            token = token.strip()
+            if token.startswith("driver "):
+                driver = token[7:] or None
+            elif token.startswith("pcie "):
+                pcie = token[5:] or None
+            elif token and size is None:
+                m2 = re.match(r"^(\d+)(GB|TB)$", token, re.IGNORECASE)
+                if m2:
+                    size = int(m2.group(1))
+                    size_unit = m2.group(2).upper()
+        gpus.append(
+            GpuSlotIn(
+                uuid=uuid_,
+                name=name or None,
+                size=size,
+                size_unit=size_unit,
+                driver_version=driver,
+                pcie_id=pcie,
+            )
+        )
+    return gpus
+
+
 @router.post("/import/csv")
 async def import_csv(
     file: UploadFile = File(...), session: Session = Depends(get_session)
@@ -441,8 +525,9 @@ async def import_csv(
             summary["errors"].append(f"第 {row_no} 行:缺 hostname,已跳过")
             continue
         push = DevicePush(
-            hostname=hostname,
-            serial_number=row.get("serial_number") or None,
+            # CSV 代表设备全量状态(agent.full_sync 默认 True)
+            agent=AgentInfo(source="csv_import"),
+            os=OsInfo(hostname=hostname),
             mgmt=MgmtInfo(
                 mac=row.get("mgmt_mac") or None,
                 ip=row.get("mgmt_ip") or None,
@@ -452,11 +537,11 @@ async def import_csv(
                     else None
                 ),
             ),
-            nics=_nics_from_csv(row.get("nics")),
-            # 不带采集时间:回导不触碰 last_pushed_at,避免倒退为导出时刻
-            timestamp=None,
-            full_sync=True,  # CSV 代表设备全量状态
-            source="csv_import",
+            hardware=HardwareInfo(
+                chassis_serial_number=row.get("serial_number") or None,
+                nics=_nics_from_csv(row.get("nics")),
+                gpu=GpuInfo(slots=_gpus_from_csv(row.get("gpus"))),
+            ),
         )
         result = ingest_push(session, push, utcnow(), update_last_pushed=False)
         summary[result["result"]] += 1

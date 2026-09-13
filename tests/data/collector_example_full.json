@@ -1,91 +1,117 @@
 {
-  "hostname": "S1A01DC-VL101",
-  "serial_number": "PF4ABC123456",
+  "agent": {
+    "version": "1.2.0",
+    "source": "collector",
+    "timestamp": "2026-09-13T10:00:00+08:00",
+    "full_sync": true
+  },
+  "os": {
+    "hostname": "S1A01DC-VL101",
+    "type": "Linux",
+    "version": "Ubuntu 22.04",
+    "kernel": "5.15.0-91-generic"
+  },
   "mgmt": {
     "mac": "AA:BB:CC:DD:EE:01",
     "ip": "192.168.10.101",
     "prefix_length": 24
   },
-  "nics": [
-    {
-      "name": "eth0",
-      "mac": "AA:BB:CC:DD:EE:02",
-      "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]
-    },
-    {
-      "name": "eth1",
-      "mac": "AA:BB:CC:DD:EE:03",
-      "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
-    }
-  ],
-  "memory": {
-    "slots": [
+  "hardware": {
+    "chassis_serial_number": "PF4ABC123456",
+    "nics": [
       {
-        "slot": "DIMM_A1",
-        "manufacturer": "Samsung",
-        "part_number": "M321R8GA0BB0-CQKZJ",
-        "type": "DDR5",
-        "size_gb": 64,
-        "speed_mts": 4800,
-        "serial_number": "123123456"
+        "name": "eth0",
+        "mac": "AA:BB:CC:DD:EE:02",
+        "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]
       },
       {
-        "slot": "DIMM_A2",
-        "manufacturer": "Samsung",
-        "part_number": "M321R8GA0BB0-CQKZJ",
-        "type": "DDR5",
-        "size_gb": 64,
-        "speed_mts": 4800,
-        "serial_number": "123123457"
-      },
-      {
-        "slot": "DIMM_B1",
-        "manufacturer": "Kingston",
-        "part_number": "KSM56R46BD4PMI-32HAI",
-        "type": "DDR5",
-        "size_gb": 32,
-        "speed_mts": 4800,
-        "serial_number": "123123458"
+        "name": "eth1",
+        "mac": "AA:BB:CC:DD:EE:03",
+        "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
       }
-    ]
-  },
-  "cpus": [
-    {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
-    {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
-  ],
-  "disks": [
-    {
-      "serial_number": "123123123",
-      "type": "SSD",
-      "manufacturer": "Samsung",
-      "model": "990EVO",
-      "size": 8,
-      "size_unit": "TB"
+    ],
+    "memory": {
+      "slots": [
+        {
+          "slot": "DIMM_A1",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 64,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "123123456"
+        },
+        {
+          "slot": "DIMM_A2",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 64,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "123123457"
+        },
+        {
+          "slot": "DIMM_B1",
+          "manufacturer": "Kingston",
+          "part_number": "KSM56R46BD4PMI-32HAI",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "123123458"
+        }
+      ]
     },
-    {
-      "serial_number": "123456",
-      "type": "HDD",
-      "manufacturer": "HGST",
-      "model": "HUH728080ALE604",
-      "size": 8,
-      "size_unit": "TB"
+    "cpus": [
+      {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
+      {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
+    ],
+    "disks": [
+      {
+        "serial_number": "123123123",
+        "type": "SSD",
+        "manufacturer": "Samsung",
+        "model": "990EVO",
+        "size": 8,
+        "size_unit": "TB"
+      },
+      {
+        "serial_number": "123456",
+        "type": "HDD",
+        "manufacturer": "HGST",
+        "model": "HUH728080ALE604",
+        "size": 8,
+        "size_unit": "TB"
+      }
+    ],
+    "psus": [
+      {
+        "serial_number": "2P0123123132",
+        "manufacturer": "GreatWall",
+        "model": "CRPS2700D2",
+        "max_power_w": 2700
+      },
+      {
+        "serial_number": "2P0123123133",
+        "manufacturer": "GreatWall",
+        "model": "CRPS2700D2",
+        "max_power_w": 2700
+      }
+    ],
+    "gpu": {
+      "slots": [
+        {
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-9a1b2c3d4e5f",
+          "name": "NVIDIA GeForce RTX 4090",
+          "serial_number": "G123456",
+          "size": 24,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:3b:00.0"
+        }
+      ]
     }
-  ],
-  "psus": [
-    {
-      "serial_number": "2P0123123132",
-      "manufacturer": "GreatWall",
-      "model": "CRPS2700D2",
-      "max_power_w": 2700
-    },
-    {
-      "serial_number": "2P0123123133",
-      "manufacturer": "GreatWall",
-      "model": "CRPS2700D2",
-      "max_power_w": 2700
-    }
-  ],
-  "timestamp": "2026-09-13T10:00:00+08:00",
-  "full_sync": true,
-  "source": "collector"
+  }
 }

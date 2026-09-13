@@ -8,6 +8,7 @@ from cmdb.models import (
     Cpu,
     Device,
     Disk,
+    Gpu,
     MemorySlot,
     Nic,
     NicIP,
@@ -22,25 +23,41 @@ RECEIVED_AT = datetime(2026, 9, 11, 15, 30, 0)
 
 
 def make_push(**overrides) -> DevicePush:
-    """构造基础推送体(2 块网卡),可按字段覆盖。"""
+    """构造新格式推送体(2 块网卡),可按字段覆盖;旧键名自动映射到新结构。"""
     base = {
-        "hostname": "S1A01DC-VL101",
-        "serial_number": "PF4ABC123456",
+        "agent": {"source": "collector", "full_sync": True},
+        "os": {"hostname": "S1A01DC-VL101"},
         "mgmt": {
             "mac": "AA:BB:CC:DD:EE:01",
             "ip": "192.168.10.101",
             "prefix_length": 24,
         },
-        "nics": [
-            {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-             "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
-            {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-             "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
-        ],
-        "full_sync": True,
-        "source": "collector",
+        "hardware": {
+            "chassis_serial_number": "PF4ABC123456",
+            "nics": [
+                {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
+                 "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
+                {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
+                 "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
+            ],
+        },
     }
-    base.update(overrides)
+    # 便捷覆盖:旧键名映射到新结构
+    for key in ("nics", "memory", "cpus", "disks", "psus"):
+        if key in overrides:
+            base["hardware"][key] = overrides.pop(key)
+    if "gpus" in overrides:
+        base["hardware"]["gpu"] = overrides.pop("gpus")
+    if "serial_number" in overrides:
+        base["hardware"]["chassis_serial_number"] = overrides.pop("serial_number")
+    if "timestamp" in overrides:
+        base["agent"]["timestamp"] = overrides.pop("timestamp")
+    if "full_sync" in overrides:
+        base["agent"]["full_sync"] = overrides.pop("full_sync")
+    hostname = overrides.pop("hostname", None)
+    if hostname:
+        base["os"]["hostname"] = hostname
+    base.update(overrides)  # mgmt 等同名字段直接覆盖
     return DevicePush(**base)
 
 
@@ -198,7 +215,7 @@ def memory_slots(*slots) -> dict:
     return {
         "slots": [
             {"slot": s[0], "manufacturer": "Samsung", "part_number": s[1],
-             "type": "DDR5", "size_gb": s[2], "speed_mts": 4800,
+             "type": "DDR5", "size": s[2], "size_unit": "GB", "speed_mts": 4800,
              "serial_number": s[3]}
             for s in slots
         ]
@@ -411,3 +428,65 @@ def test_apply_psu_added_and_changed(engine):
         pending = session.get(PendingChange, result["pending_change_id"])
         result = apply_resolution(session, pending, {}, {}, {}, {}, {}, {"PSN1": "new"})
         assert result["applied"] == ["电源 PSN1 max_power_w: 2700 -> 2400"]
+
+
+def gpus(*slots) -> dict:
+    return {
+        "slots": [
+            {"uuid": s[0], "name": s[1], "serial_number": s[2],
+             "size": s[3], "size_unit": "GB", "driver_version": "535.0",
+             "pcie_id": s[4]}
+            for s in slots
+        ]
+    }
+
+
+def test_gpu_added_removed_and_changed(engine):
+    with Session(engine) as session:
+        ingest_push(
+            session,
+            make_push(gpus=gpus(
+                ("GPU-A", "H100", "SN1", 80, "0000:1B:00.0"),
+                ("GPU-B", "H100", "SN2", 80, "0000:1C:00.0"),
+            )),
+            RECEIVED_AT,
+        )
+        assert len(session.exec(select(Gpu)).all()) == 2
+
+        # full_sync 少一块 → 候删
+        result = ingest_push(
+            session,
+            make_push(gpus=gpus(("GPU-A", "H100", "SN1", 80, "0000:1B:00.0"))),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        result = apply_resolution(
+            session, pending, {}, {}, {}, {}, {}, {}, {"GPU-B": "new"}
+        )
+        assert result["applied"] == ["GPU GPU-B 删除"]
+        assert [g.uuid for g in session.exec(select(Gpu)).all()] == ["GPU-A"]
+
+        # 驱动版本变化 → changed
+        result = ingest_push(
+            session,
+            make_push(gpus=gpus(
+                ("GPU-A", "H100", "SN1", 80, "0000:1B:00.0"),
+            )),
+            RECEIVED_AT,
+        )
+        result = ingest_push(
+            session,
+            make_push(gpus=gpus(
+                ("GPU-A", "H100", "SN1", 80, "0000:1B:00.1"),
+            )),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        result = apply_resolution(
+            session, pending, {}, {}, {}, {}, {}, {}, {"GPU-A": "new"}
+        )
+        assert result["applied"] == [
+            "GPU GPU-A pcie_id: 0000:1B:00.0 -> 0000:1B:00.1"
+        ]

@@ -52,5 +52,6 @@ def resolve_pending_change(
         body.cpu_choices,
         body.disk_choices,
         body.psu_choices,
+        body.gpu_choices,
     )
     return {"applied": result["applied"], "pending_id": pending.id, "status": "applied"}

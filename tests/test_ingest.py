@@ -7,7 +7,7 @@ from pathlib import Path
 from sqlmodel import Session, select
 
 from cmdb.models import Device, Nic, NicIP, PendingChange
-from cmdb.schemas import DevicePush
+from cmdb.schemas import DevicePush, normalise_legacy
 from cmdb.services.ingest import ingest_push
 
 # naive UTC(与库中存取格式一致)
@@ -15,25 +15,41 @@ RECEIVED_AT = datetime(2026, 9, 11, 15, 30, 0)
 
 
 def make_push(**overrides) -> DevicePush:
-    """构造基础推送体(2 块网卡),可按字段覆盖。"""
+    """构造新格式推送体(2 块网卡),可按字段覆盖;旧键名自动映射到新结构。"""
     base = {
-        "hostname": "S1A01DC-VL101",
-        "serial_number": "PF4ABC123456",
+        "agent": {"source": "collector", "full_sync": True},
+        "os": {"hostname": "S1A01DC-VL101"},
         "mgmt": {
             "mac": "AA:BB:CC:DD:EE:01",
             "ip": "192.168.10.101",
             "prefix_length": 24,
         },
-        "nics": [
-            {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-             "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
-            {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-             "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
-        ],
-        "full_sync": True,
-        "source": "collector",
+        "hardware": {
+            "chassis_serial_number": "PF4ABC123456",
+            "nics": [
+                {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
+                 "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
+                {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
+                 "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
+            ],
+        },
     }
-    base.update(overrides)
+    # 便捷覆盖:旧键名映射到新结构
+    for key in ("nics", "memory", "cpus", "disks", "psus"):
+        if key in overrides:
+            base["hardware"][key] = overrides.pop(key)
+    if "gpus" in overrides:
+        base["hardware"]["gpu"] = {"slots": overrides.pop("gpus")}
+    if "serial_number" in overrides:
+        base["hardware"]["chassis_serial_number"] = overrides.pop("serial_number")
+    if "timestamp" in overrides:
+        base["agent"]["timestamp"] = overrides.pop("timestamp")
+    if "full_sync" in overrides:
+        base["agent"]["full_sync"] = overrides.pop("full_sync")
+    hostname = overrides.pop("hostname", None)
+    if hostname:
+        base["os"]["hostname"] = hostname
+    base.update(overrides)  # mgmt 等同名字段直接覆盖
     return DevicePush(**base)
 
 
@@ -113,7 +129,7 @@ def test_conflict_pushes_merge_into_one_pending(engine):
         diff = pendings[0].diff
         fields = {f["field"]: f for f in diff["fields"]}
         assert fields["mgmt.ip"]["new"] == "192.168.10.200"
-        assert fields["serial_number"]["new"] == "PF4ABC999999"
+        assert fields["hardware.chassis_serial_number"]["new"] == "PF4ABC999999"
 
 
 def test_full_sync_removed_nic_in_diff(engine):
@@ -143,7 +159,7 @@ def test_push_timestamp_normalized_to_utc(engine):
 
 
 def test_real_collector_example_json(engine):
-    """用户真实采集示例 JSON(4 块网卡)端到端推送。"""
+    """用户真实采集示例 JSON(新格式,4 块网卡)端到端推送。"""
     example_path = Path(__file__).parent / "data" / "collector_example.json"
     raw = json.loads(example_path.read_text(encoding="utf-8"))
     push = DevicePush(**raw)
@@ -156,7 +172,8 @@ def test_real_collector_example_json(engine):
         assert device.serial_number == "PF4ABC123456"
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
         assert len(nics) == 4
-        assert device.last_pushed_at == RECEIVED_AT
+        # last_pushed_at 取 agent.timestamp(2026-09-13T10:00+08:00 -> UTC)
+        assert device.last_pushed_at == datetime(2026, 9, 13, 2, 0, 0)
 
         # 再次推送一致数据 -> unchanged
         again = ingest_push(session, push, RECEIVED_AT)

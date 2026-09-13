@@ -8,6 +8,7 @@ from cmdb.models import (
     Cpu,
     Device,
     Disk,
+    Gpu,
     MemorySlot,
     Nic,
     NicIP,
@@ -28,11 +29,15 @@ def build_snapshot(session: Session, device: Device) -> dict:
         "mgmt_mac": device.mgmt_mac,
         "mgmt_ip": device.mgmt_ip,
         "mgmt_prefix_length": device.mgmt_prefix_length,
+        "os_type": device.os_type,
+        "os_version": device.os_version,
+        "kernel": device.kernel,
         "nics": {},
         "memory": {},
         "cpus": {},
         "disks": {},
         "psus": {},
+        "gpus": {},
     }
     for nic in nics:
         ips = session.exec(select(NicIP).where(NicIP.nic_id == nic.id)).all()
@@ -47,6 +52,8 @@ def build_snapshot(session: Session, device: Device) -> dict:
             "manufacturer": mem.manufacturer,
             "part_number": mem.part_number,
             "type": mem.type,
+            "size": mem.size,
+            "size_unit": mem.size_unit,
             "size_gb": mem.size_gb,
             "speed_mts": mem.speed_mts,
             "serial_number": mem.serial_number,
@@ -70,6 +77,16 @@ def build_snapshot(session: Session, device: Device) -> dict:
             "model": psu.model,
             "max_power_w": psu.max_power_w,
         }
+    for gpu in session.exec(select(Gpu).where(Gpu.device_id == device.id)):
+        snapshot["gpus"][gpu.uuid] = {
+            "uuid": gpu.uuid,
+            "name": gpu.name,
+            "serial_number": gpu.serial_number,
+            "size": gpu.size,
+            "size_unit": gpu.size_unit,
+            "driver_version": gpu.driver_version,
+            "pcie_id": gpu.pcie_id,
+        }
     return snapshot
 
 
@@ -89,7 +106,7 @@ def ingest_push(
     (CSV 回导等非真实推送场景,避免倒退最后推送时间)。
     """
     device = session.exec(
-        select(Device).where(Device.hostname == push.hostname)
+        select(Device).where(Device.hostname == push.os.hostname)
     ).first()
 
     if device is None:
@@ -104,7 +121,7 @@ def ingest_push(
     diff = diff_push(snapshot, push)
     if not diff["has_changes"]:
         if update_last_pushed:
-            device.last_pushed_at = to_naive_utc(push.timestamp or received_at)
+            device.last_pushed_at = to_naive_utc(push.agent.timestamp or received_at)
             session.add(device)
         session.commit()
         return {
@@ -122,34 +139,46 @@ def ingest_push(
 
 
 def _create_device(session: Session, push: DevicePush, received_at: datetime) -> Device:
-    """按推送体创建设备 + 网卡 + IP。"""
+    """按推送体创建设备 + 全部硬件。"""
+    hw = push.hardware
     device = Device(
-        hostname=push.hostname,
-        serial_number=push.serial_number,
+        hostname=push.os.hostname,
+        serial_number=hw.chassis_serial_number,
         mgmt_mac=push.mgmt.mac,
         mgmt_ip=push.mgmt.ip,
         mgmt_prefix_length=push.mgmt.prefix_length,
-        last_pushed_at=to_naive_utc(push.timestamp or received_at),
+        os_type=push.os.type,
+        os_version=push.os.version,
+        kernel=push.os.kernel,
+        agent_version=push.agent.version,
+        last_pushed_at=to_naive_utc(push.agent.timestamp or received_at),
     )
     session.add(device)
     session.flush()
 
-    for nic in push.nics:
+    for nic in hw.nics:
         _create_nic(session, device.id, nic)
-    if push.memory:
-        for mem in push.memory.slots:
-            session.add(MemorySlot(device_id=device.id, **mem.model_dump()))
-    if push.cpus:
-        for cpu in push.cpus:
+    if hw.memory:
+        for mem in hw.memory.slots:
+            data = mem.model_dump()
+            data["size_gb"] = normalized_size_gb(mem.size, mem.size_unit)
+            session.add(MemorySlot(device_id=device.id, **data))
+    if hw.cpus:
+        for cpu in hw.cpus:
             session.add(Cpu(device_id=device.id, **cpu.model_dump()))
-    if push.disks:
-        for disk in push.disks:
+    if hw.disks:
+        for disk in hw.disks:
             data = disk.model_dump()
             data["size_gb"] = normalized_size_gb(disk.size, disk.size_unit)
             session.add(Disk(device_id=device.id, **data))
-    if push.psus:
-        for psu in push.psus:
+    if hw.psus:
+        for psu in hw.psus:
             session.add(Psu(device_id=device.id, **psu.model_dump()))
+    if hw.gpu:
+        for gpu in hw.gpu.slots:
+            data = gpu.model_dump()
+            data["size_gb"] = normalized_size_gb(gpu.size, gpu.size_unit)
+            session.add(Gpu(device_id=device.id, **data))
     session.commit()
     session.refresh(device)
     return device
@@ -178,14 +207,14 @@ def _merge_into_pending(
     if pending is None:
         pending = PendingChange(
             device_id=device.id,
-            source=push.source,
+            source=push.agent.source,
             payload=push.model_dump(mode="json"),
             diff=diff,
         )
     else:
         pending.diff = merge_diff(pending.diff, diff)
         pending.payload = push.model_dump(mode="json")
-        pending.source = push.source or pending.source
+        pending.source = push.agent.source or pending.source
 
     session.add(pending)
     session.commit()

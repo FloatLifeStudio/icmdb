@@ -18,6 +18,7 @@ from cmdb.models import (
     Cpu,
     Device,
     Disk,
+    Gpu,
     MemorySlot,
     Nic,
     NicIP,
@@ -29,7 +30,10 @@ from cmdb.models import (
 
 # 主机字段路径 -> Device 属性
 _FIELD_ATTRS = {
-    "serial_number": "serial_number",
+    "hardware.chassis_serial_number": "serial_number",
+    "os.type": "os_type",
+    "os.version": "os_version",
+    "os.kernel": "kernel",
     "mgmt.mac": "mgmt_mac",
     "mgmt.ip": "mgmt_ip",
     "mgmt.prefix_length": "mgmt_prefix_length",
@@ -40,9 +44,19 @@ _MEMORY_FIELDS = (
     "manufacturer",
     "part_number",
     "type",
-    "size_gb",
+    "size",
+    "size_unit",
     "speed_mts",
     "serial_number",
+)
+
+_GPU_FIELDS = (
+    "name",
+    "serial_number",
+    "size",
+    "size_unit",
+    "driver_version",
+    "pcie_id",
 )
 
 
@@ -84,6 +98,49 @@ def _apply_memory(session: Session, device: Device, entry: dict) -> None:
         return
     for change in entry.get("changes", []):
         if change["field"] in _MEMORY_FIELDS:
+            setattr(existing, change["field"], change["new"])
+    # 容量归一化列随 size/size_unit 变化重算
+    if existing.size is not None:
+        existing.size_gb = normalized_size_gb(existing.size, existing.size_unit)
+
+
+def _apply_gpu(session: Session, device: Device, entry: dict) -> None:
+    """按裁决结果处理单个 GPU 条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    uuid_ = entry["uuid"]
+    existing = session.exec(
+        select(Gpu).where(Gpu.device_id == device.id, Gpu.uuid == uuid_)
+    ).first()
+
+    if entry["kind"] == "added":
+        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+            return
+        new = entry["new"]
+        session.add(
+            Gpu(
+                device_id=device.id,
+                uuid=uuid_,
+                name=new.get("name"),
+                serial_number=new.get("serial_number"),
+                size=new.get("size"),
+                size_unit=new.get("size_unit"),
+                driver_version=new.get("driver_version"),
+                pcie_id=new.get("pcie_id"),
+                size_gb=normalized_size_gb(new.get("size"), new.get("size_unit")),
+            )
+        )
+        return
+
+    if entry["kind"] == "removed":
+        if existing is None:
+            return
+        session.delete(existing)
+        return
+
+    # kind == changed
+    if existing is None:
+        return
+    for change in entry.get("changes", []):
+        if change["field"] in _GPU_FIELDS:
             setattr(existing, change["field"], change["new"])
 
 
@@ -257,6 +314,7 @@ def apply_resolution(
     cpu_choices: dict[str, str] | None = None,
     disk_choices: dict[str, str] | None = None,
     psu_choices: dict[str, str] | None = None,
+    gpu_choices: dict[str, str] | None = None,
 ) -> dict:
     """应用裁决:选择 new 的条目生效,选择 old 的保留现状。
 
@@ -363,6 +421,22 @@ def apply_resolution(
                     f"{change['old']} -> {change['new']}"
                 )
         _apply_psu(session, device, entry)
+
+    for entry in pending.diff.get("gpus", []):
+        choice = (gpu_choices or {}).get(entry["uuid"])
+        if choice != "new":
+            continue
+        if entry["kind"] == "added":
+            summaries.append(f"GPU {entry['uuid']} 新增")
+        elif entry["kind"] == "removed":
+            summaries.append(f"GPU {entry['uuid']} 删除")
+        else:
+            for change in entry.get("changes", []):
+                summaries.append(
+                    f"GPU {entry['uuid']} {change['field']}: "
+                    f"{change['old']} -> {change['new']}"
+                )
+        _apply_gpu(session, device, entry)
 
     pending.status = "applied"
     pending.resolved_at = utcnow()

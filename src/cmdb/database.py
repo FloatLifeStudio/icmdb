@@ -51,6 +51,7 @@ def migrate(engine) -> None:
                     conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
         _migrate_tags_column(conn)
         _migrate_disk_size(conn)
+        _migrate_memory_size(conn)
         # 存量表补索引(SQLModel create_all 不会给已存在的表加索引)
         hcols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(changehistory)")}
         if hcols and "created_at" in hcols:
@@ -91,6 +92,19 @@ def _migrate_disk_size(conn) -> None:
     conn.exec_driver_sql(
         "UPDATE disk SET size_gb = CASE "
         "WHEN UPPER(size_unit) = 'TB' THEN size * 1024 ELSE size END"
+    )
+
+
+def _migrate_memory_size(conn) -> None:
+    """旧 memoryslot 表补 size/size_unit 列并从 size_gb 回填(旧数据全为 GB)。"""
+    cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(memoryslot)")}
+    if "size" in cols or not cols:  # 新库由 create_all 带出;表不存在则跳过
+        return
+    conn.exec_driver_sql("ALTER TABLE memoryslot ADD COLUMN size INTEGER")
+    conn.exec_driver_sql("ALTER TABLE memoryslot ADD COLUMN size_unit VARCHAR")
+    conn.exec_driver_sql(
+        "UPDATE memoryslot SET size = size_gb, size_unit = 'GB' "
+        "WHERE size_gb IS NOT NULL"
     )
 
 

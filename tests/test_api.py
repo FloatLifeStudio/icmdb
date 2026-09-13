@@ -53,6 +53,56 @@ def test_push_invalid_payload_422(client):
     assert r.status_code == 422
 
 
+def test_new_format_push_with_gpu(client):
+    """新格式推送:agent/os/hardware 结构,GPU 入库,os 字段存储。"""
+    push = {
+        "agent": {"version": "0.1.0", "source": "collector",
+                  "timestamp": "2026-09-13T10:00:00+08:00"},
+        "os": {"hostname": "S1A01DC-VL101", "type": "linux",
+               "version": "Ubuntu 22.04.5 LTS", "kernel": "5.15.0-131-generic"},
+        "mgmt": {"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.101",
+                 "prefix_length": 24},
+        "hardware": {
+            "chassis_serial_number": "PF4ABC123456",
+            "gpu": {"slots": [
+                {"uuid": "GPU-abc", "name": "NVIDIA H100 80GB HBM3",
+                 "serial_number": "2Q4123123132", "size": 80, "size_unit": "GB",
+                 "driver_version": "535.183.01", "pcie_id": "0000:1B:00.0"}
+            ]},
+        },
+    }
+    r = client.post("/api/v1/devices", json=push)
+    assert r.status_code == 200
+    assert r.json()["result"] == "created"
+
+    detail = client.get("/api/v1/devices/1").json()
+    assert detail["os_type"] == "linux"
+    assert detail["os_version"] == "Ubuntu 22.04.5 LTS"
+    assert detail["kernel"] == "5.15.0-131-generic"
+    assert detail["agent_version"] == "0.1.0"
+    assert len(detail["gpus"]) == 1
+    assert detail["gpus"][0]["uuid"] == "GPU-abc"
+    assert detail["gpus"][0]["size_gb"] == 80
+
+
+def test_legacy_format_compatible(client):
+    """旧格式(顶层 hostname 等)自动转换,旧采集器不断。"""
+    legacy = {
+        "hostname": "S1A01DC-VL101",
+        "serial_number": "PF4ABC123456",
+        "nics": [{"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
+                  "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]}],
+        "full_sync": False,
+        "source": "collector",
+    }
+    r = client.post("/api/v1/devices", json=legacy)
+    assert r.status_code == 200
+    assert r.json()["result"] == "created"
+    detail = client.get("/api/v1/devices/1").json()
+    assert detail["hostname"] == "S1A01DC-VL101"
+    assert detail["serial_number"] == "PF4ABC123456"
+
+
 def test_list_and_detail(client):
     client.post("/api/v1/devices", json=make_push())
 

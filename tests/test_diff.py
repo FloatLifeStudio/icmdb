@@ -5,21 +5,37 @@ from cmdb.services.diff import diff_push, merge_diff
 
 
 def make_push(**overrides) -> DevicePush:
-    """构造与用户示例 JSON 等价的推送体,可按字段覆盖。"""
+    """构造新格式推送体,可按字段覆盖;旧键名自动映射到新结构。"""
     base = {
-        "hostname": "S1A01DC-VL101",
-        "serial_number": "PF4ABC123456",
+        "agent": {"source": "collector", "full_sync": True},
+        "os": {"hostname": "S1A01DC-VL101"},
         "mgmt": MgmtInfo(mac="AA:BB:CC:DD:EE:01", ip="192.168.10.101", prefix_length=24),
-        "nics": [
-            NicIn(name="eth0", mac="AA:BB:CC:DD:EE:02",
-                  ips=[NicIPIn(ip="10.10.1.101", prefix_length=24)]),
-            NicIn(name="eth1", mac="AA:BB:CC:DD:EE:03",
-                  ips=[NicIPIn(ip="10.10.2.101", prefix_length=24)]),
-        ],
-        "full_sync": True,
-        "source": "collector",
+        "hardware": {
+            "chassis_serial_number": "PF4ABC123456",
+            "nics": [
+                NicIn(name="eth0", mac="AA:BB:CC:DD:EE:02",
+                      ips=[NicIPIn(ip="10.10.1.101", prefix_length=24)]),
+                NicIn(name="eth1", mac="AA:BB:CC:DD:EE:03",
+                      ips=[NicIPIn(ip="10.10.2.101", prefix_length=24)]),
+            ],
+        },
     }
-    base.update(overrides)
+    # 便捷覆盖:旧键名映射到新结构
+    for key in ("nics", "memory", "cpus", "disks", "psus"):
+        if key in overrides:
+            base["hardware"][key] = overrides.pop(key)
+    if "gpus" in overrides:
+        base["hardware"]["gpu"] = {"slots": overrides.pop("gpus")}
+    if "serial_number" in overrides:
+        base["hardware"]["chassis_serial_number"] = overrides.pop("serial_number")
+    if "timestamp" in overrides:
+        base["agent"]["timestamp"] = overrides.pop("timestamp")
+    if "full_sync" in overrides:
+        base["agent"]["full_sync"] = overrides.pop("full_sync")
+    hostname = overrides.pop("hostname", None)
+    if hostname:
+        base["os"]["hostname"] = hostname
+    base.update(overrides)  # mgmt 等同名字段直接覆盖
     return DevicePush(**base)
 
 
@@ -121,7 +137,7 @@ def test_nic_removed_only_with_full_sync():
     assert removed[0]["name"] == "eth1"
     assert removed[0]["old"]["mac"] == "AA:BB:CC:DD:EE:03"
 
-    push.full_sync = False
+    push.agent.full_sync = False
     diff = diff_push(make_snapshot(), push)
     assert diff["has_changes"] is False
 

@@ -28,6 +28,10 @@ class Device(SQLModel, table=True):
     mgmt_mac: str | None = None
     mgmt_ip: str | None = None
     mgmt_prefix_length: int | None = None
+    os_type: str | None = None
+    os_version: str | None = None
+    kernel: str | None = None
+    agent_version: str | None = None
     last_pushed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
@@ -69,7 +73,10 @@ class NicIP(SQLModel, table=True):
 
 
 class MemorySlot(SQLModel, table=True):
-    """内存槽位表,slot 为身份(device 内唯一),如 DIMM_A1。"""
+    """内存槽位表,slot 为身份(device 内唯一),如 DIMM_A1。
+
+    size + size_unit 为标称容量原始值;size_gb 为归一化数值列。
+    """
 
     __table_args__ = (UniqueConstraint("device_id", "slot"),)
 
@@ -79,9 +86,31 @@ class MemorySlot(SQLModel, table=True):
     manufacturer: str | None = None
     part_number: str | None = None
     type: str | None = None
+    size: int | None = None
+    size_unit: str | None = None
     size_gb: int | None = None
     speed_mts: int | None = None
     serial_number: str | None = None
+
+
+class Gpu(SQLModel, table=True):
+    """GPU 表,uuid 为身份(device 内唯一)。
+
+    size + size_unit 为标称显存原始值;size_gb 为归一化数值列。
+    """
+
+    __table_args__ = (UniqueConstraint("device_id", "uuid"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    device_id: int = Field(foreign_key="device.id", index=True)
+    uuid: str
+    name: str | None = None
+    serial_number: str | None = None
+    size: int | None = None
+    size_unit: str | None = None
+    size_gb: int | None = None
+    driver_version: str | None = None
+    pcie_id: str | None = None
 
 
 class Cpu(SQLModel, table=True):

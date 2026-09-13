@@ -13,17 +13,28 @@ diff 结构约定(pending_changes.diff 存的就是它):
 }
 
 语义:
-- hostname 是匹配键,不参与 diff
+- os.hostname 是匹配键,不参与 diff
 - 推送体中标量字段为 None 视为未采集,不清空库中已有数据
-- 网卡身份是 name:同名视为同一块网卡,mac/ips 变化进 changed
-- kind=removed 仅在 full_sync=true 时产生(库中多出的网卡候删)
+- 硬件条目身份:网卡 name、内存/CPU slot、硬盘/电源 serial_number、GPU uuid
+- kind=removed 仅在 agent.full_sync=true 时产生(库中多出的条目候删)
 """
 
-from cmdb.schemas import CpuSlotIn, DevicePush, DiskIn, MemorySlotIn, NicIn, PsuIn
+from cmdb.schemas import (
+    CpuSlotIn,
+    DevicePush,
+    DiskIn,
+    GpuSlotIn,
+    MemorySlotIn,
+    NicIn,
+    PsuIn,
+)
 
 # 主机字段:推送体字段路径 -> 快照键
 _HOST_FIELDS = {
-    "serial_number": "serial_number",
+    "hardware.chassis_serial_number": "serial_number",
+    "os.type": "os_type",
+    "os.version": "os_version",
+    "os.kernel": "kernel",
     "mgmt.mac": "mgmt_mac",
     "mgmt.ip": "mgmt_ip",
     "mgmt.prefix_length": "mgmt_prefix_length",
@@ -46,16 +57,33 @@ def _memory_repr(mem: MemorySlotIn) -> dict:
         "manufacturer": mem.manufacturer,
         "part_number": mem.part_number,
         "type": mem.type,
-        "size_gb": mem.size_gb,
+        "size": mem.size,
+        "size_unit": mem.size_unit,
         "speed_mts": mem.speed_mts,
         "serial_number": mem.serial_number,
+    }
+
+
+def _gpu_repr(gpu: GpuSlotIn) -> dict:
+    """GPU 的完整表示,用于 added 条目。"""
+    return {
+        "uuid": gpu.uuid,
+        "name": gpu.name,
+        "serial_number": gpu.serial_number,
+        "size": gpu.size,
+        "size_unit": gpu.size_unit,
+        "driver_version": gpu.driver_version,
+        "pcie_id": gpu.pcie_id,
     }
 
 
 def _host_diff(snapshot: dict, push: DevicePush) -> list[dict]:
     """主机字段级 diff,返回差异条目列表。"""
     pushed = {
-        "serial_number": push.serial_number,
+        "hardware.chassis_serial_number": push.hardware.chassis_serial_number,
+        "os.type": push.os.type,
+        "os.version": push.os.version,
+        "os.kernel": push.os.kernel,
         "mgmt.mac": push.mgmt.mac,
         "mgmt.ip": push.mgmt.ip,
         "mgmt.prefix_length": push.mgmt.prefix_length,
@@ -170,7 +198,8 @@ def _memory_diff(
             "manufacturer": mem.manufacturer,
             "part_number": mem.part_number,
             "type": mem.type,
-            "size_gb": mem.size_gb,
+            "size": mem.size,
+            "size_unit": mem.size_unit,
             "speed_mts": mem.speed_mts,
             "serial_number": mem.serial_number,
         }
@@ -375,34 +404,102 @@ def _psu_diff(
     return entries
 
 
+def _gpu_diff(
+    snapshot_gpus: dict[str, dict],
+    pushed_gpus: list[GpuSlotIn],
+    full_sync: bool,
+) -> list[dict]:
+    """GPU 级 diff。身份 uuid。snapshot_gpus: {uuid: {字段: 值}}。"""
+    entries: list[dict] = []
+    pushed_uuids = set()
+
+    for gpu in pushed_gpus:
+        pushed_uuids.add(gpu.uuid)
+        old = snapshot_gpus.get(gpu.uuid)
+        if old is None:
+            entries.append(
+                {
+                    "uuid": gpu.uuid,
+                    "kind": "added",
+                    "changes": [],
+                    "old": None,
+                    "new": _gpu_repr(gpu),
+                }
+            )
+            continue
+
+        changes = []
+        pushed_fields = {
+            "name": gpu.name,
+            "serial_number": gpu.serial_number,
+            "size": gpu.size,
+            "size_unit": gpu.size_unit,
+            "driver_version": gpu.driver_version,
+            "pcie_id": gpu.pcie_id,
+        }
+        for field, new in pushed_fields.items():
+            if new is None:
+                continue
+            if new != old.get(field):
+                changes.append({"field": field, "old": old.get(field), "new": new})
+        if changes:
+            entries.append(
+                {"uuid": gpu.uuid, "kind": "changed", "changes": changes}
+            )
+
+    if full_sync:
+        for uuid_, old in sorted(snapshot_gpus.items()):
+            if uuid_ not in pushed_uuids:
+                entries.append(
+                    {
+                        "uuid": uuid_,
+                        "kind": "removed",
+                        "changes": [],
+                        "old": old,
+                        "new": None,
+                    }
+                )
+
+    return entries
+
+
 def diff_push(snapshot: dict, push: DevicePush) -> dict:
     """比较推送体与库中设备当前快照,返回完整 diff 清单。
 
     snapshot 由 ingest 层从 ORM 对象构建:
     {"serial_number", "mgmt_mac", "mgmt_ip", "mgmt_prefix_length",
-     "nics": {name: {"name", "mac", "ips": {ip: prefix}}},
-     "memory": {slot: {...}}, "cpus": {slot: {...}}}
+     "os_type", "os_version", "kernel",
+     "nics": {name: {...}}, "memory": {slot: {...}}, "cpus": {slot: {...}},
+     "disks": {sn: {...}}, "psus": {sn: {...}}, "gpus": {uuid: {...}}}
     """
+    hw = push.hardware
     diff = {
         "fields": _host_diff(snapshot, push),
-        "nics": _nics_diff(snapshot.get("nics", {}), push.nics, push.full_sync),
+        "nics": _nics_diff(snapshot.get("nics", {}), hw.nics, push.agent.full_sync),
         "memory": _memory_diff(
-            snapshot.get("memory", {}), (push.memory.slots if push.memory else []),
-            push.full_sync,
+            snapshot.get("memory", {}), (hw.memory.slots if hw.memory else []),
+            push.agent.full_sync,
         ),
         "cpus": _cpu_diff(
-            snapshot.get("cpus", {}), (push.cpus if push.cpus else []), push.full_sync
+            snapshot.get("cpus", {}), (hw.cpus if hw.cpus else []),
+            push.agent.full_sync,
         ),
         "disks": _disk_diff(
-            snapshot.get("disks", {}), (push.disks if push.disks else []), push.full_sync
+            snapshot.get("disks", {}), (hw.disks if hw.disks else []),
+            push.agent.full_sync,
         ),
         "psus": _psu_diff(
-            snapshot.get("psus", {}), (push.psus if push.psus else []), push.full_sync
+            snapshot.get("psus", {}), (hw.psus if hw.psus else []),
+            push.agent.full_sync,
+        ),
+        "gpus": _gpu_diff(
+            snapshot.get("gpus", {}), (hw.gpu.slots if hw.gpu else []),
+            push.agent.full_sync,
         ),
     }
     diff["has_changes"] = bool(
         diff["fields"] or diff["nics"] or diff["memory"] or diff["cpus"]
-        or diff["disks"] or diff["psus"]
+        or diff["disks"] or diff["psus"] or diff["gpus"]
     )
     return diff
 
@@ -439,6 +536,9 @@ def merge_diff(existing: dict, new: dict) -> dict:
     merged_psus = _merge_by(
         "serial_number", existing.get("psus", []) + new.get("psus", [])
     )
+    merged_gpus = _merge_by(
+        "uuid", existing.get("gpus", []) + new.get("gpus", [])
+    )
 
     return {
         "fields": merged_fields,
@@ -447,8 +547,9 @@ def merge_diff(existing: dict, new: dict) -> dict:
         "cpus": merged_cpus,
         "disks": merged_disks,
         "psus": merged_psus,
+        "gpus": merged_gpus,
         "has_changes": bool(
             merged_fields or merged_nics or merged_memory or merged_cpus
-            or merged_disks or merged_psus
+            or merged_disks or merged_psus or merged_gpus
         ),
     }
