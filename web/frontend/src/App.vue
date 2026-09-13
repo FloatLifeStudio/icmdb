@@ -10,7 +10,15 @@
           <el-icon><Monitor /></el-icon>资产列表
         </el-menu-item>
         <el-menu-item index="/conflicts">
-          <el-icon><EditPen /></el-icon>冲突裁决
+          <el-icon><EditPen /></el-icon>
+          <span class="menu-item-label">冲突裁决</span>
+          <el-badge
+            v-if="pendingCount"
+            :value="pendingCount"
+            :max="99"
+            type="danger"
+            class="menu-badge"
+          />
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -21,7 +29,26 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Monitor, EditPen, Odometer } from '@element-plus/icons-vue'
+import { api } from './api'
+
+const route = useRoute()
+const pendingCount = ref(0)
+
+// 待裁决数量气泡:进入应用与切换页面时刷新
+async function loadPendingCount() {
+  try {
+    const res = await api.dashboard()
+    pendingCount.value = res.pending_changes
+  } catch {
+    // 静默失败,不影响页面使用
+  }
+}
+
+watch(() => route.path, loadPendingCount)
+loadPendingCount()
 </script>
 
 <style scoped>
@@ -39,6 +66,12 @@ import { Monitor, EditPen, Odometer } from '@element-plus/icons-vue'
 }
 .menu {
   border-right: none;
+}
+.menu-item-label {
+  flex: 1;
+}
+.menu-badge {
+  margin-left: auto;
 }
 .main {
   background: var(--el-bg-color-page);

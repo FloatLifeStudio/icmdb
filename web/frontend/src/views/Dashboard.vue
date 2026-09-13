@@ -66,19 +66,27 @@ function toggleExpand(row: HistoryRow, _column: unknown, event: Event) {
   tableRef.value?.toggleRowExpansion(row)
 }
 
-// 变更内容紧凑概览:改了哪些字段/网卡,完整明细在展开行
+// 变更内容概览:只写大类(如 内存,CPU),完整明细在展开行
 function digest(row: HistoryRow): string {
   const diff = row.diff as
-    | { fields?: unknown[]; nics?: { name: string }[] }
+    | {
+        fields?: unknown[]
+        nics?: unknown[]
+        memory?: unknown[]
+        cpus?: unknown[]
+        disks?: unknown[]
+        psus?: unknown[]
+      }
     | null
   if (!diff) return '-'
   const parts: string[] = []
-  const nf = diff.fields?.length ?? 0
-  const nics = diff.nics ?? []
-  if (nf) parts.push(`修改 ${nf} 个字段`)
-  if (nics.length)
-    parts.push(`改动网卡 ${nics.map((n) => n.name).join('、')}`)
-  return parts.length ? parts.join(', ') : '-'
+  if (diff.fields?.length) parts.push('主机字段')
+  if (diff.nics?.length) parts.push('网卡')
+  if (diff.memory?.length) parts.push('内存')
+  if (diff.cpus?.length) parts.push('CPU')
+  if (diff.disks?.length) parts.push('硬盘')
+  if (diff.psus?.length) parts.push('电源')
+  return parts.length ? parts.join(',') : '-'
 }
 
 const statCards = computed(() => [
