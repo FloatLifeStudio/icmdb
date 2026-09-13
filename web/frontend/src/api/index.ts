@@ -20,6 +20,8 @@ export interface MemorySlot {
   manufacturer: string | null
   part_number: string | null
   type: string | null
+  size: number | null
+  size_unit: string | null
   size_gb: number | null
   speed_mts: number | null
   serial_number: string | null
@@ -50,10 +52,26 @@ export interface Psu {
   max_power_w: number | null
 }
 
+export interface Gpu {
+  id: number
+  uuid: string
+  name: string | null
+  serial_number: string | null
+  size: number | null
+  size_unit: string | null
+  size_gb: number | null
+  driver_version: string | null
+  pcie_id: string | null
+}
+
 export interface DeviceOut {
   id: number
   hostname: string
   serial_number: string | null
+  os_type: string | null
+  os_version: string | null
+  kernel: string | null
+  agent_version: string | null
   mgmt_mac: string | null
   mgmt_ip: string | null
   mgmt_prefix_length: number | null
@@ -67,6 +85,7 @@ export interface DeviceOut {
   cpus: CpuSlot[]
   disks: Disk[]
   psus: Psu[]
+  gpus: Gpu[]
 }
 
 export interface DeviceListOut {
@@ -93,6 +112,7 @@ export interface NicDiff {
 export interface SlotDiff {
   slot?: string
   serial_number?: string
+  uuid?: string
   kind: 'added' | 'removed' | 'changed'
   changes: { field: string; old: unknown; new: unknown }[]
   old: Record<string, unknown> | null
@@ -111,6 +131,7 @@ export interface PendingChange {
     cpus?: SlotDiff[]
     disks?: SlotDiff[]
     psus?: SlotDiff[]
+    gpus?: SlotDiff[]
     has_changes: boolean
   }
   status: string
@@ -131,6 +152,7 @@ export interface ResolveBody {
   cpu_choices?: Record<string, string>
   disk_choices?: Record<string, string>
   psu_choices?: Record<string, string>
+  gpu_choices?: Record<string, string>
 }
 
 export interface DashboardOut {

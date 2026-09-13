@@ -27,6 +27,18 @@
         <el-descriptions-item label="序列号">
           {{ device.serial_number || '-' }}
         </el-descriptions-item>
+        <el-descriptions-item label="OS 类型">
+          {{ device.os_type || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="OS 版本">
+          {{ device.os_version || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="内核">
+          {{ device.kernel || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="采集器版本">
+          {{ device.agent_version || '-' }}
+        </el-descriptions-item>
         <el-descriptions-item label="管理 MAC">
           {{ device.mgmt_mac || '-' }}
         </el-descriptions-item>
@@ -89,7 +101,9 @@
           <template #default="{ row }">{{ row.type || '-' }}</template>
         </el-table-column>
         <el-table-column label="容量" width="100">
-          <template #default="{ row }">{{ row.size_gb ? row.size_gb + 'GB' : '-' }}</template>
+          <template #default="{ row }">
+            {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
+          </template>
         </el-table-column>
         <el-table-column label="频率" width="110">
           <template #default="{ row }">{{ row.speed_mts ? row.speed_mts + 'MT/s' : '-' }}</template>
@@ -144,6 +158,29 @@
           </template>
         </el-table-column>
         <el-table-column prop="serial_number" label="SN" min-width="130" />
+      </el-table>
+    </el-card>
+
+    <el-card v-if="device && device.gpus.length" class="card">
+      <template #header>GPU</template>
+      <el-table :data="device.gpus" border>
+        <el-table-column prop="name" label="型号" min-width="200">
+          <template #default="{ row }">{{ row.name || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="显存" width="100">
+          <template #default="{ row }">
+            {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="driver_version" label="驱动" width="130">
+          <template #default="{ row }">{{ row.driver_version || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="pcie_id" label="PCIe" width="130">
+          <template #default="{ row }">{{ row.pcie_id || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="SN" min-width="130">
+          <template #default="{ row }">{{ row.serial_number || '-' }}</template>
+        </el-table-column>
       </el-table>
     </el-card>
 
@@ -219,6 +256,7 @@ function digest(row: HistoryRow): string {
         cpus?: unknown[]
         disks?: unknown[]
         psus?: unknown[]
+        gpus?: unknown[]
       }
     | null
   if (!diff) return '-'
@@ -229,6 +267,7 @@ function digest(row: HistoryRow): string {
   if (diff.cpus?.length) parts.push('CPU')
   if (diff.disks?.length) parts.push('硬盘')
   if (diff.psus?.length) parts.push('电源')
+  if (diff.gpus?.length) parts.push('GPU')
   return parts.length ? parts.join(',') : '-'
 }
 

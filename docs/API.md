@@ -31,59 +31,83 @@
 | `unchanged` | 库中有且字段级无差异 | 仅刷新 last_pushed_at |
 | `diff_created` | 库中有且有差异 | 差异进待裁决,**不动现有数据** |
 
-**请求体**:
+**请求体**(v2.2 起:`agent` / `os` / `mgmt` / `hardware` 四段结构):
 
 ```json
 {
-  "hostname": "S1A01DC-VL101",
-  "serial_number": "PF4ABC123456",
+  "agent": {
+    "version": "1.2.0",
+    "source": "collector",
+    "timestamp": "2026-09-13T10:00:00+08:00",
+    "full_sync": true
+  },
+  "os": {
+    "hostname": "S1A01DC-VL101",
+    "type": "Linux",
+    "version": "Ubuntu 22.04",
+    "kernel": "5.15.0-91-generic"
+  },
   "mgmt": {
     "mac": "AA:BB:CC:DD:EE:01",
     "ip": "192.168.10.101",
     "prefix_length": 24
   },
-  "nics": [
-    {
-      "name": "eth0",
-      "mac": "AA:BB:CC:DD:EE:02",
-      "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]
-    },
-    {
-      "name": "eth1",
-      "mac": "AA:BB:CC:DD:EE:03",
-      "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
-    }
-  ],
-  "memory": {
-    "slots": [
+  "hardware": {
+    "chassis_serial_number": "PF4ABC123456",
+    "nics": [
       {
-        "slot": "DIMM_A1",
-        "manufacturer": "Samsung",
-        "part_number": "M321R8GA0BB0-CQKZJ",
-        "type": "DDR5",
-        "size_gb": 64,
-        "speed_mts": 4800,
-        "serial_number": "123123456"
+        "name": "eth0",
+        "mac": "AA:BB:CC:DD:EE:02",
+        "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]
+      },
+      {
+        "name": "eth1",
+        "mac": "AA:BB:CC:DD:EE:03",
+        "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
       }
-    ]
-  },
-  "cpus": [
-    {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
-    {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
-  ],
-  "disks": [
-    {"serial_number": "123123123", "type": "SSD", "manufacturer": "Samsung",
-     "model": "990EVO", "size": 8, "size_unit": "TB"},
-    {"serial_number": "123456", "type": "HDD", "manufacturer": "HGST",
-     "model": "HUH728080ALE604", "size": 8, "size_unit": "TB"}
-  ],
-  "psus": [
-    {"serial_number": "2P0123123132", "manufacturer": "GreatWall",
-     "model": "CRPS2700D2", "max_power_w": 2700}
-  ],
-  "timestamp": "2026-09-11T15:30:00+08:00",
-  "full_sync": true,
-  "source": "collector"
+    ],
+    "memory": {
+      "slots": [
+        {
+          "slot": "DIMM_A1",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 64,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "123123456"
+        }
+      ]
+    },
+    "cpus": [
+      {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
+      {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
+    ],
+    "disks": [
+      {"serial_number": "123123123", "type": "SSD", "manufacturer": "Samsung",
+       "model": "990EVO", "size": 8, "size_unit": "TB"},
+      {"serial_number": "123456", "type": "HDD", "manufacturer": "HGST",
+       "model": "HUH728080ALE604", "size": 8, "size_unit": "TB"}
+    ],
+    "psus": [
+      {"serial_number": "2P0123123132", "manufacturer": "GreatWall",
+       "model": "CRPS2700D2", "max_power_w": 2700}
+    ],
+    "gpu": {
+      "slots": [
+        {
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-9a1b2c3d4e5f",
+          "name": "NVIDIA GeForce RTX 4090",
+          "serial_number": "G123456",
+          "size": 24,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:3b:00.0"
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -91,17 +115,26 @@
 
 | 字段 | 必填 | 说明 |
 |---|---|---|
-| `hostname` | ✅ | 设备唯一匹配键;主机改名 = 新设备 |
-| `serial_number` | ❌ | 序列号;未采集(None)不清空库中已有值 |
+| `agent` | ❌ | 采集器信息,默认全缺省 |
+| `agent.version` | ❌ | 采集器版本,写入设备详情 |
+| `agent.source` | ❌ | 来源标识,写入待裁决记录与变更历史 |
+| `agent.timestamp` | ❌ | 采集时间 ISO 8601(带时区,会归一化为 UTC);缺省用服务器接收时间 |
+| `agent.full_sync` | ❌ | 默认 **true**。**true = 全量同步**:库中多出的硬件条目进 diff 候删;false = 增量:库中多出的保持不动 |
+| `os.hostname` | ✅ | 设备唯一匹配键;主机改名 = 新设备 |
+| `os.type` / `os.version` / `os.kernel` | ❌ | OS 类型 / 版本 / 内核;未采集(None)不清空库中已有值 |
 | `mgmt` | ❌ | 管理口信息:mac / ip / prefix_length |
-| `nics` | ❌ | 网卡数组,推多少收多少;`name` 是网卡身份 |
-| `memory` | ❌ | 内存信息:`slots` 数组,`slot` 是身份;字段含 manufacturer / part_number / type(代数)/ size_gb(理论容量 GB)/ speed_mts(MT/s)/ serial_number |
-| `cpus` | ❌ | CPU 数组,`slot` 是身份;字段含 model(型号) |
-| `disks` | ❌ | 硬盘数组,`serial_number` 是身份;字段含 type(SSD/HDD)/ manufacturer / model / size + size_unit(理论容量,GB 或 TB) |
-| `psus` | ❌ | 电源数组,`serial_number` 是身份;字段含 manufacturer / model / max_power_w(最大功率 W) |
-| `full_sync` | ❌ | 默认 false。**true = 全量同步**:库中多出的网卡/内存槽位/CPU 进 diff 候删;false = 增量:库中多出的保持不动 |
-| `timestamp` | ❌ | 采集时间 ISO 8601(带时区,会归一化为 UTC);缺省用服务器接收时间 |
-| `source` | ❌ | 来源标识,写入待裁决记录与变更历史 |
+| `hardware.chassis_serial_number` | ❌ | 机箱序列号;未采集不清空库中已有值 |
+| `hardware.nics` | ❌ | 网卡数组,推多少收多少;`name` 是网卡身份 |
+| `hardware.memory` | ❌ | 内存信息:`slots` 数组,`slot` 是身份;字段含 manufacturer / part_number / type(代数)/ size + size_unit(理论容量,GB 或 TB)/ speed_mts(MT/s)/ serial_number |
+| `hardware.cpus` | ❌ | CPU 数组,`slot` 是身份;字段含 model(型号) |
+| `hardware.disks` | ❌ | 硬盘数组,`serial_number` 是身份;字段含 type(SSD/HDD)/ manufacturer / model / size + size_unit(理论容量) |
+| `hardware.psus` | ❌ | 电源数组,`serial_number` 是身份;字段含 manufacturer / model / max_power_w(最大功率 W) |
+| `hardware.gpu` | ❌ | GPU 信息:`slots` 数组,`uuid` 是身份;字段含 name / serial_number / size + size_unit(显存)/ driver_version / pcie_id |
+
+**兼容旧格式**:仅含顶层 `hostname` 的旧版推送体仍可接收,服务端自动归一化为
+新结构(旧 `serial_number` → `hardware.chassis_serial_number`,旧顶层
+`timestamp` / `full_sync` / `source` → `agent.*`,旧内存 `size_gb` →
+`size` + `GB`)。新采集器一律推新格式。
 
 **curl 示例**:
 
@@ -185,7 +218,7 @@ curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
 
 ### `DELETE /api/v1/devices/{id}` — 手工删除
 
-硬删设备与网卡数据(IP、待裁决记录连带删除);**变更历史保留**。成功返回 204。
+硬删设备与网卡、内存、CPU、硬盘、电源、GPU 数据(待裁决记录连带删除);**变更历史保留**。成功返回 204。
 
 ```bash
 curl -X DELETE http://192.168.201.18:8080/api/v1/devices/1
@@ -245,7 +278,7 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 | `removed` | full_sync=true 时库里多出的(候删) |
 | `changed` | 同名网卡的 mac 或 ips 有变化,`changes` 数组逐条列出 |
 
-`memory` / `cpus` 条目结构同上(`slot` 为身份),`kind` 含义一致。`disks` / `psus` 条目结构同上(`serial_number` 为身份)。
+`memory` / `cpus` 条目结构同上(`slot` 为身份),`kind` 含义一致。`disks` / `psus` 条目结构同上(`serial_number` 为身份),`gpus` 条目结构同上(`uuid` 为身份)。
 
 ### `GET /api/v1/pending-changes/{id}` — diff 详情
 
@@ -265,7 +298,8 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
   "memory_choices": {"DIMM_A1": "new"},
   "cpu_choices": {"CPU0": "new"},
   "disk_choices": {"123123123": "new"},
-  "psu_choices": {"2P0123123132": "new"}
+  "psu_choices": {"2P0123123132": "new"},
+  "gpu_choices": {"GPU-3f2a1b9c": "new"}
 }
 ```
 
@@ -277,6 +311,7 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 | `cpu_choices` | CPU 槽位条目:槽位名 -> `new` / `old` |
 | `disk_choices` | 硬盘条目:SN -> `new` / `old` |
 | `psu_choices` | 电源条目:SN -> `new` / `old` |
+| `gpu_choices` | GPU 条目:UUID -> `new` / `old` |
 
 **响应**:
 

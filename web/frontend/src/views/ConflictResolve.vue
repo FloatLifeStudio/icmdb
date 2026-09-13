@@ -187,6 +187,33 @@
           </el-table>
         </el-card>
 
+        <el-card class="card" v-if="pending.diff.gpus?.length">
+          <template #header>GPU</template>
+          <el-table :data="pending.diff.gpus" border>
+            <el-table-column label="UUID" width="130">
+              <template #default="{ row }">{{ row.uuid }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="kindTag[row.kind]" size="small">
+                  {{ kindLabel[row.kind] }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="变更内容" min-width="280">
+              <template #default="{ row }">{{ partContent(gpuRepr, row) }}</template>
+            </el-table-column>
+            <el-table-column label="裁决" width="220">
+              <template #default="{ row }">
+                <el-radio-group v-model="gpuChoices[row.uuid!]" v-if="row.uuid">
+                  <el-radio value="old">{{ gpuOldLabel[row.kind] }}</el-radio>
+                  <el-radio value="new">{{ gpuNewLabel[row.kind] }}</el-radio>
+                </el-radio-group>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
         <div
           class="actions"
           v-if="pending.diff.fields.length || pending.diff.nics.length || pending.diff.memory?.length || pending.diff.cpus?.length || pending.diff.disks?.length || pending.diff.psus?.length"
@@ -224,6 +251,7 @@ const memoryChoices = ref<Record<string, string>>({})
 const cpuChoices = ref<Record<string, string>>({})
 const diskChoices = ref<Record<string, string>>({})
 const psuChoices = ref<Record<string, string>>({})
+const gpuChoices = ref<Record<string, string>>({})
 const listLoading = ref(false)
 const resolving = ref(false)
 const tableRef = ref<TableInstance>()
@@ -314,15 +342,35 @@ const psuNewLabel: Record<string, string> = {
   removed: '删除该电源',
   changed: '采用新值',
 }
+const gpuOldLabel: Record<string, string> = {
+  added: '丢弃(不新增)',
+  removed: '保留(不删除)',
+  changed: '保留旧值',
+}
+const gpuNewLabel: Record<string, string> = {
+  added: '新增该 GPU',
+  removed: '删除该 GPU',
+  changed: '采用新值',
+}
 
 function memoryRepr(m: Record<string, unknown>): string {
   const parts: string[] = []
   if (m.manufacturer) parts.push(String(m.manufacturer))
   if (m.part_number) parts.push(String(m.part_number))
   if (m.type) parts.push(String(m.type))
-  if (m.size_gb) parts.push(`${m.size_gb}GB`)
+  if (m.size) parts.push(`${m.size}${m.size_unit ?? ''}`)
   if (m.speed_mts) parts.push(`${m.speed_mts}MT/s`)
   if (m.serial_number) parts.push(`SN:${m.serial_number}`)
+  return parts.length ? parts.join(' ') : '-'
+}
+
+function gpuRepr(g: Record<string, unknown>): string {
+  const parts: string[] = []
+  if (g.name) parts.push(String(g.name))
+  if (g.size) parts.push(`${g.size}${g.size_unit ?? ''}`)
+  if (g.driver_version) parts.push(`driver:${g.driver_version}`)
+  if (g.pcie_id) parts.push(`${g.pcie_id}`)
+  if (g.serial_number) parts.push(`SN:${g.serial_number}`)
   return parts.length ? parts.join(' ') : '-'
 }
 
@@ -417,6 +465,7 @@ function selectPending(row: PendingChange | null) {
   cpuChoices.value = {}
   diskChoices.value = {}
   psuChoices.value = {}
+  gpuChoices.value = {}
   if (row) {
     for (const f of row.diff.fields) fieldChoices.value[f.field] = 'new'
     for (const n of row.diff.nics) nicChoices.value[n.name] = 'new'
@@ -427,6 +476,8 @@ function selectPending(row: PendingChange | null) {
       if (d.serial_number) diskChoices.value[d.serial_number] = 'new'
     for (const p of row.diff.psus ?? [])
       if (p.serial_number) psuChoices.value[p.serial_number] = 'new'
+    for (const g of row.diff.gpus ?? [])
+      if (g.uuid) gpuChoices.value[g.uuid] = 'new'
   }
 }
 
@@ -442,6 +493,8 @@ function keepAllOld() {
     if (d.serial_number) diskChoices.value[d.serial_number] = 'old'
   for (const p of pending.value.diff.psus ?? [])
     if (p.serial_number) psuChoices.value[p.serial_number] = 'old'
+  for (const g of pending.value.diff.gpus ?? [])
+    if (g.uuid) gpuChoices.value[g.uuid] = 'old'
   ElMessage.info('已全部选择保留旧值,可直接提交')
 }
 
@@ -459,6 +512,7 @@ async function submit() {
       cpu_choices: cpuChoices.value,
       disk_choices: diskChoices.value,
       psu_choices: psuChoices.value,
+      gpu_choices: gpuChoices.value,
     })
     ElMessage.success(
       res.applied.length

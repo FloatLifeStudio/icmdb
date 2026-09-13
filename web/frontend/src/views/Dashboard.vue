@@ -76,6 +76,7 @@ function digest(row: HistoryRow): string {
         cpus?: unknown[]
         disks?: unknown[]
         psus?: unknown[]
+        gpus?: unknown[]
       }
     | null
   if (!diff) return '-'
@@ -86,6 +87,7 @@ function digest(row: HistoryRow): string {
   if (diff.cpus?.length) parts.push('CPU')
   if (diff.disks?.length) parts.push('硬盘')
   if (diff.psus?.length) parts.push('电源')
+  if (diff.gpus?.length) parts.push('GPU')
   return parts.length ? parts.join(',') : '-'
 }
 
