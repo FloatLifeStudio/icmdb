@@ -19,7 +19,7 @@ diff 结构约定(pending_changes.diff 存的就是它):
 - kind=removed 仅在 full_sync=true 时产生(库中多出的网卡候删)
 """
 
-from cmdb.schemas import DevicePush, NicIn
+from cmdb.schemas import CpuSlotIn, DevicePush, MemorySlotIn, NicIn
 
 # 主机字段:推送体字段路径 -> 快照键
 _HOST_FIELDS = {
@@ -36,6 +36,19 @@ def _nic_repr(nic: NicIn) -> dict:
         "name": nic.name,
         "mac": nic.mac,
         "ips": [{"ip": ip.ip, "prefix_length": ip.prefix_length} for ip in nic.ips],
+    }
+
+
+def _memory_repr(mem: MemorySlotIn) -> dict:
+    """内存槽位的完整表示,用于 added 条目。"""
+    return {
+        "slot": mem.slot,
+        "manufacturer": mem.manufacturer,
+        "part_number": mem.part_number,
+        "type": mem.type,
+        "size_gb": mem.size_gb,
+        "speed_mts": mem.speed_mts,
+        "serial_number": mem.serial_number,
     }
 
 
@@ -128,48 +141,170 @@ def _nics_diff(
     return entries
 
 
+def _memory_diff(
+    snapshot_memory: dict[str, dict],
+    pushed_slots: list[MemorySlotIn],
+    full_sync: bool,
+) -> list[dict]:
+    """内存槽位级 diff。snapshot_memory: {slot: {字段: 值}}。"""
+    entries: list[dict] = []
+    pushed_slots_names = set()
+
+    for mem in pushed_slots:
+        pushed_slots_names.add(mem.slot)
+        old = snapshot_memory.get(mem.slot)
+        if old is None:
+            entries.append(
+                {
+                    "slot": mem.slot,
+                    "kind": "added",
+                    "changes": [],
+                    "old": None,
+                    "new": _memory_repr(mem),
+                }
+            )
+            continue
+
+        changes = []
+        pushed_fields = {
+            "manufacturer": mem.manufacturer,
+            "part_number": mem.part_number,
+            "type": mem.type,
+            "size_gb": mem.size_gb,
+            "speed_mts": mem.speed_mts,
+            "serial_number": mem.serial_number,
+        }
+        for field, new in pushed_fields.items():
+            if new is None:
+                continue
+            if new != old.get(field):
+                changes.append({"field": field, "old": old.get(field), "new": new})
+        if changes:
+            entries.append({"slot": mem.slot, "kind": "changed", "changes": changes})
+
+    if full_sync:
+        for slot, old in sorted(snapshot_memory.items()):
+            if slot not in pushed_slots_names:
+                entries.append(
+                    {
+                        "slot": slot,
+                        "kind": "removed",
+                        "changes": [],
+                        "old": old,
+                        "new": None,
+                    }
+                )
+
+    return entries
+
+
+def _cpu_diff(
+    snapshot_cpus: dict[str, dict],
+    pushed_cpus: list[CpuSlotIn],
+    full_sync: bool,
+) -> list[dict]:
+    """CPU 槽位级 diff。snapshot_cpus: {slot: {"slot", "model"}}。"""
+    entries: list[dict] = []
+    pushed_slots = set()
+
+    for cpu in pushed_cpus:
+        pushed_slots.add(cpu.slot)
+        old = snapshot_cpus.get(cpu.slot)
+        if old is None:
+            entries.append(
+                {
+                    "slot": cpu.slot,
+                    "kind": "added",
+                    "changes": [],
+                    "old": None,
+                    "new": {"slot": cpu.slot, "model": cpu.model},
+                }
+            )
+            continue
+
+        if cpu.model and cpu.model != old.get("model"):
+            entries.append(
+                {
+                    "slot": cpu.slot,
+                    "kind": "changed",
+                    "changes": [
+                        {"field": "model", "old": old.get("model"), "new": cpu.model}
+                    ],
+                }
+            )
+
+    if full_sync:
+        for slot, old in sorted(snapshot_cpus.items()):
+            if slot not in pushed_slots:
+                entries.append(
+                    {
+                        "slot": slot,
+                        "kind": "removed",
+                        "changes": [],
+                        "old": old,
+                        "new": None,
+                    }
+                )
+
+    return entries
+
+
 def diff_push(snapshot: dict, push: DevicePush) -> dict:
     """比较推送体与库中设备当前快照,返回完整 diff 清单。
 
     snapshot 由 ingest 层从 ORM 对象构建:
     {"serial_number", "mgmt_mac", "mgmt_ip", "mgmt_prefix_length",
-     "nics": {name: {"name", "mac", "ips": {ip: prefix}}}}
+     "nics": {name: {"name", "mac", "ips": {ip: prefix}}},
+     "memory": {slot: {...}}, "cpus": {slot: {...}}}
     """
     diff = {
         "fields": _host_diff(snapshot, push),
         "nics": _nics_diff(snapshot.get("nics", {}), push.nics, push.full_sync),
+        "memory": _memory_diff(
+            snapshot.get("memory", {}), (push.memory.slots if push.memory else []),
+            push.full_sync,
+        ),
+        "cpus": _cpu_diff(
+            snapshot.get("cpus", {}), (push.cpus if push.cpus else []), push.full_sync
+        ),
     }
-    diff["has_changes"] = bool(diff["fields"] or diff["nics"])
+    diff["has_changes"] = bool(
+        diff["fields"] or diff["nics"] or diff["memory"] or diff["cpus"]
+    )
     return diff
 
 
 def merge_diff(existing: dict, new: dict) -> dict:
     """合并同设备的新旧待裁决 diff(始终一条 pending)。
 
-    语义:同一条目(字段路径 / 网卡名)以最新推送为准,新条目追加,去重。
+    语义:同一条目(字段路径 / 网卡名 / 内存与 CPU 槽位)以最新推送为准,
+    新条目追加,去重。
     """
-    merged_fields: list[dict] = []
-    field_index: dict[str, int] = {}
-    for entry in existing.get("fields", []) + new.get("fields", []):
-        key = entry["field"]
-        if key in field_index:
-            merged_fields[field_index[key]] = entry
-        else:
-            field_index[key] = len(merged_fields)
-            merged_fields.append(entry)
 
-    merged_nics: list[dict] = []
-    nic_index: dict[str, int] = {}
-    for entry in existing.get("nics", []) + new.get("nics", []):
-        key = entry["name"]
-        if key in nic_index:
-            merged_nics[nic_index[key]] = entry
-        else:
-            nic_index[key] = len(merged_nics)
-            merged_nics.append(entry)
+    def _merge_by(key: str, entries: list[dict]) -> list[dict]:
+        merged: list[dict] = []
+        index: dict[str, int] = {}
+        for entry in entries:
+            if entry[key] in index:
+                merged[index[entry[key]]] = entry
+            else:
+                index[entry[key]] = len(merged)
+                merged.append(entry)
+        return merged
+
+    merged_fields = _merge_by(
+        "field", existing.get("fields", []) + new.get("fields", [])
+    )
+    merged_nics = _merge_by("name", existing.get("nics", []) + new.get("nics", []))
+    merged_memory = _merge_by(
+        "slot", existing.get("memory", []) + new.get("memory", [])
+    )
+    merged_cpus = _merge_by("slot", existing.get("cpus", []) + new.get("cpus", []))
 
     return {
         "fields": merged_fields,
         "nics": merged_nics,
-        "has_changes": bool(merged_fields or merged_nics),
+        "memory": merged_memory,
+        "cpus": merged_cpus,
+        "has_changes": bool(merged_fields or merged_nics or merged_memory or merged_cpus),
     }

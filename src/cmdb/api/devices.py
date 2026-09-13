@@ -11,13 +11,15 @@ from sqlmodel import Session, select
 
 from cmdb.config import settings
 from cmdb.database import get_session
-from cmdb.models import Device, Nic, NicIP, PendingChange, utcnow
+from cmdb.models import Cpu, Device, MemorySlot, Nic, NicIP, PendingChange, utcnow
 from cmdb.schemas import (
     BatchDeleteIn,
+    CpuSlotOut,
     DeviceCreatedOut,
     DeviceOut,
     DevicePush,
     MgmtInfo,
+    MemorySlotOut,
     NicIn,
     NicIPOut,
     NicOut,
@@ -64,6 +66,13 @@ def _delete_device_children(session: Session, device_id: int) -> None:
     ).all():
         session.delete(pending)
     session.flush()
+    for mem in session.exec(
+        select(MemorySlot).where(MemorySlot.device_id == device_id)
+    ).all():
+        session.delete(mem)
+    for cpu in session.exec(select(Cpu).where(Cpu.device_id == device_id)).all():
+        session.delete(cpu)
+    session.flush()
 
 
 def _to_out(session: Session, device: Device) -> DeviceOut:
@@ -83,6 +92,10 @@ def _to_out(session: Session, device: Device) -> DeviceOut:
                 ],
             )
         )
+    memory = session.exec(
+        select(MemorySlot).where(MemorySlot.device_id == device.id)
+    ).all()
+    cpus = session.exec(select(Cpu).where(Cpu.device_id == device.id)).all()
     return DeviceOut(
         id=device.id,
         hostname=device.hostname,
@@ -96,6 +109,17 @@ def _to_out(session: Session, device: Device) -> DeviceOut:
         status=_device_status(device),
         tags=_split_tags(device.tags),
         nics=nic_outs,
+        memory=[
+            MemorySlotOut(
+                id=m.id, slot=m.slot, manufacturer=m.manufacturer,
+                part_number=m.part_number, type=m.type, size_gb=m.size_gb,
+                speed_mts=m.speed_mts, serial_number=m.serial_number,
+            )
+            for m in memory
+        ],
+        cpus=[
+            CpuSlotOut(id=c.id, slot=c.slot, model=c.model) for c in cpus
+        ],
     )
 
 

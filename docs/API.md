@@ -53,6 +53,23 @@
       "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
     }
   ],
+  "memory": {
+    "slots": [
+      {
+        "slot": "DIMM_A1",
+        "manufacturer": "Samsung",
+        "part_number": "M321R8GA0BB0-CQKZJ",
+        "type": "DDR5",
+        "size_gb": 64,
+        "speed_mts": 4800,
+        "serial_number": "123123456"
+      }
+    ]
+  },
+  "cpus": [
+    {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
+    {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
+  ],
   "timestamp": "2026-09-11T15:30:00+08:00",
   "full_sync": true,
   "source": "collector"
@@ -67,8 +84,10 @@
 | `serial_number` | ❌ | 序列号;未采集(None)不清空库中已有值 |
 | `mgmt` | ❌ | 管理口信息:mac / ip / prefix_length |
 | `nics` | ❌ | 网卡数组,推多少收多少;`name` 是网卡身份 |
+| `memory` | ❌ | 内存信息:`slots` 数组,`slot` 是身份;字段含 manufacturer / part_number / type(代数)/ size_gb(理论容量 GB)/ speed_mts(MT/s)/ serial_number |
+| `cpus` | ❌ | CPU 数组,`slot` 是身份;字段含 model(型号) |
+| `full_sync` | ❌ | 默认 false。**true = 全量同步**:库中多出的网卡/内存槽位/CPU 进 diff 候删;false = 增量:库中多出的保持不动 |
 | `timestamp` | ❌ | 采集时间 ISO 8601(带时区,会归一化为 UTC);缺省用服务器接收时间 |
-| `full_sync` | ❌ | 默认 false。**true = 全量同步**:库中多出的网卡进 diff 候删;false = 增量:库中多出的网卡保持不动 |
 | `source` | ❌ | 来源标识,写入待裁决记录与变更历史 |
 
 **curl 示例**:
@@ -213,6 +232,8 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 | `removed` | full_sync=true 时库里多出的(候删) |
 | `changed` | 同名网卡的 mac 或 ips 有变化,`changes` 数组逐条列出 |
 
+`memory` / `cpus` 条目结构同上(`slot` 为身份),`kind` 含义一致。
+
 ### `GET /api/v1/pending-changes/{id}` — diff 详情
 
 返回单条记录(payload + diff)。
@@ -227,7 +248,9 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 ```json
 {
   "field_choices": {"mgmt.ip": "new"},
-  "nic_choices": {"eth1": "new", "eth2": "old"}
+  "nic_choices": {"eth1": "new", "eth2": "old"},
+  "memory_choices": {"DIMM_A1": "new"},
+  "cpu_choices": {"CPU0": "new"}
 }
 ```
 
@@ -235,6 +258,8 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 |---|---|
 | `field_choices` | 主机字段:字段路径 -> `new` / `old` |
 | `nic_choices` | 网卡条目:网卡名 -> `new` / `old` |
+| `memory_choices` | 内存槽位条目:槽位名 -> `new` / `old` |
+| `cpu_choices` | CPU 槽位条目:槽位名 -> `new` / `old` |
 
 **响应**:
 

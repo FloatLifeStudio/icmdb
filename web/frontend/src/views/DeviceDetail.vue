@@ -75,6 +75,39 @@
       </el-table>
     </el-card>
 
+    <el-card v-if="device && device.memory.length" class="card">
+      <template #header>内存</template>
+      <el-table :data="device.memory" border>
+        <el-table-column prop="slot" label="槽位" width="110" />
+        <el-table-column prop="manufacturer" label="厂商" min-width="110">
+          <template #default="{ row }">{{ row.manufacturer || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="part_number" label="型号" min-width="190">
+          <template #default="{ row }">{{ row.part_number || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="type" label="代数" width="90">
+          <template #default="{ row }">{{ row.type || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="容量" width="100">
+          <template #default="{ row }">{{ row.size_gb ? row.size_gb + 'GB' : '-' }}</template>
+        </el-table-column>
+        <el-table-column label="频率" width="110">
+          <template #default="{ row }">{{ row.speed_mts ? row.speed_mts + 'MT/s' : '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="serial_number" label="SN" min-width="130">
+          <template #default="{ row }">{{ row.serial_number || '-' }}</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card v-if="device && device.cpus.length" class="card">
+      <template #header>CPU</template>
+      <el-table :data="device.cpus" border>
+        <el-table-column prop="slot" label="槽位" width="110" />
+        <el-table-column prop="model" label="型号" min-width="300" />
+      </el-table>
+    </el-card>
+
     <el-card class="card history-card">
       <template #header>变更历史(裁决生效的改动)</template>
       <el-table

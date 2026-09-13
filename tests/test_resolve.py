@@ -3,7 +3,7 @@
 from datetime import datetime
 from sqlmodel import Session, select
 
-from cmdb.models import ChangeHistory, Device, Nic, NicIP, PendingChange
+from cmdb.models import ChangeHistory, Cpu, Device, MemorySlot, Nic, NicIP, PendingChange
 from cmdb.schemas import DevicePush
 from cmdb.services.ingest import ingest_push
 from cmdb.services.resolve import apply_resolution
@@ -182,3 +182,125 @@ def test_history_kept_after_device_delete(engine):
         histories = session.exec(select(ChangeHistory)).all()
         assert len(histories) == 1  # 历史仍在
         assert session.exec(select(PendingChange)).all() == []  # pending 已删
+
+
+def memory_slots(*slots) -> dict:
+    return {
+        "slots": [
+            {"slot": s[0], "manufacturer": "Samsung", "part_number": s[1],
+             "type": "DDR5", "size_gb": s[2], "speed_mts": 4800,
+             "serial_number": s[3]}
+            for s in slots
+        ]
+    }
+
+
+def test_apply_memory_added(engine):
+    with Session(engine) as session:
+        ingest_push(
+            session,
+            make_push(memory=memory_slots(
+                ("DIMM_A1", "PN-A", 64, "111"))),
+            RECEIVED_AT,
+        )
+        result = ingest_push(
+            session,
+            make_push(memory=memory_slots(
+                ("DIMM_A1", "PN-A", 64, "111"), ("DIMM_B1", "PN-B", 64, "222"))),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+
+        result = apply_resolution(session, pending, {}, {}, {"DIMM_B1": "new"})
+        assert result["applied"] == ["内存 DIMM_B1 新增"]
+        slots = session.exec(select(MemorySlot)).all()
+        assert [m.slot for m in slots] == ["DIMM_A1", "DIMM_B1"]
+
+
+def test_apply_memory_removed(engine):
+    with Session(engine) as session:
+        ingest_push(
+            session,
+            make_push(memory=memory_slots(
+                ("DIMM_A1", "PN-A", 64, "111"), ("DIMM_B1", "PN-B", 64, "222"))),
+            RECEIVED_AT,
+        )
+        result = ingest_push(
+            session,
+            make_push(memory=memory_slots(("DIMM_A1", "PN-A", 64, "111"))),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+
+        result = apply_resolution(session, pending, {}, {}, {"DIMM_B1": "new"})
+        assert result["applied"] == ["内存 DIMM_B1 删除"]
+        slots = session.exec(select(MemorySlot)).all()
+        assert [m.slot for m in slots] == ["DIMM_A1"]
+
+
+def test_apply_memory_changed(engine):
+    with Session(engine) as session:
+        ingest_push(
+            session,
+            make_push(memory=memory_slots(("DIMM_A1", "PN-A", 64, "111"))),
+            RECEIVED_AT,
+        )
+        result = ingest_push(
+            session,
+            make_push(memory=memory_slots(("DIMM_A1", "PN-B", 32, "111"))),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+
+        result = apply_resolution(session, pending, {}, {}, {"DIMM_A1": "new"})
+        assert len(result["applied"]) == 2  # part_number + size_gb
+        mem = session.exec(select(MemorySlot)).one()
+        assert mem.part_number == "PN-B"
+        assert mem.size_gb == 32
+        assert mem.serial_number == "111"  # 未变化的保持不变
+
+
+def test_apply_cpu_added_and_changed(engine):
+    with Session(engine) as session:
+        ingest_push(
+            session,
+            make_push(cpus=[{"slot": "CPU0", "model": "Xeon-6448Y"}]),
+            RECEIVED_AT,
+        )
+        result = ingest_push(
+            session,
+            make_push(
+                cpus=[
+                    {"slot": "CPU0", "model": "Xeon-6448Y"},
+                    {"slot": "CPU1", "model": "Xeon-6448Y"},
+                ]
+            ),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        apply_resolution(session, pending, {}, {}, {}, {"CPU1": "new"})
+        assert len(session.exec(select(Cpu)).all()) == 2
+
+        # 型号变化
+        result = ingest_push(
+            session,
+            make_push(
+                cpus=[
+                    {"slot": "CPU0", "model": "Xeon-6548Y"},
+                    {"slot": "CPU1", "model": "Xeon-6448Y"},
+                ]
+            ),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        result = apply_resolution(session, pending, {}, {}, {}, {"CPU0": "new"})
+        assert result["applied"] == ["CPU CPU0 model: Xeon-6448Y -> Xeon-6548Y"]
+        cpu0 = session.exec(
+            select(Cpu).where(Cpu.slot == "CPU0")
+        ).one()
+        assert cpu0.model == "Xeon-6548Y"

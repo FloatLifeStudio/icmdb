@@ -349,3 +349,52 @@ def test_spa_fallback(client):
 
     r = client.get("/api/v1/nonexistent")
     assert r.status_code == 404
+
+
+def test_push_memory_and_cpu_end_to_end(client):
+    """带内存/CPU 的推送:created → 详情可见 → �型号 diff → 裁决生效。"""
+    push = make_push(
+        memory={
+            "slots": [
+                {"slot": "DIMM_A1", "manufacturer": "Samsung",
+                 "part_number": "M321R8GA0BB0-CQKZJ", "type": "DDR5",
+                 "size_gb": 64, "speed_mts": 4800, "serial_number": "123123456"}
+            ]
+        },
+        cpus=[
+            {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
+            {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"},
+        ],
+    )
+    r = client.post("/api/v1/devices", json=push)
+    assert r.json()["result"] == "created"
+
+    device_id = r.json()["device_id"]
+    body = client.get(f"/api/v1/devices/{device_id}").json()
+    assert body["memory"][0]["slot"] == "DIMM_A1"
+    assert body["memory"][0]["part_number"] == "M321R8GA0BB0-CQKZJ"
+    assert body["memory"][0]["size_gb"] == 64
+    assert body["memory"][0]["speed_mts"] == 4800
+    assert [c["slot"] for c in body["cpus"]] == ["CPU0", "CPU1"]
+
+    # 改 CPU 型号 → diff → 裁决采用新值
+    push2 = make_push(
+        memory=push["memory"],
+        cpus=[
+            {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6548Y"},
+            {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"},
+        ],
+    )
+    r = client.post("/api/v1/devices", json=push2)
+    pending_id = r.json()["pending_change_id"]
+    assert r.json()["result"] == "diff_created"
+
+    r = client.post(
+        f"/api/v1/pending-changes/{pending_id}/resolve",
+        json={"field_choices": {}, "nic_choices": {}, "cpu_choices": {"CPU0": "new"}},
+    )
+    assert r.status_code == 200
+    assert r.json()["applied"] == ["CPU CPU0 model: Intel(R) Xeon(R) Gold 6448Y -> Intel(R) Xeon(R) Gold 6548Y"]
+
+    body = client.get(f"/api/v1/devices/{device_id}").json()
+    assert body["cpus"][0]["model"] == "Intel(R) Xeon(R) Gold 6548Y"

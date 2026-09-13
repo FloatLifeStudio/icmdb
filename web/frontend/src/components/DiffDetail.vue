@@ -1,6 +1,8 @@
 <template>
   <div class="diff-detail">
-    <template v-if="diff && (diff.fields.length || diff.nics.length)">
+    <template
+      v-if="diff && (diff.fields.length || diff.nics.length || diff.memory?.length || diff.cpus?.length)"
+    >
       <h4 class="section-title">主机字段</h4>
       <el-table :data="diff.fields" border size="small">
         <el-table-column prop="field" label="字段" min-width="140" />
@@ -29,6 +31,46 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <template v-if="diff.memory?.length">
+        <h4 class="section-title">内存</h4>
+        <el-table :data="diff.memory" border size="small">
+          <el-table-column prop="slot" label="槽位" width="110" />
+          <el-table-column label="类型" width="90">
+            <template #default="{ row }">
+              <el-tag :type="kindTag[row.kind]" size="small">
+                {{ kindLabel[row.kind] }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="变化" min-width="280">
+            <template #default="{ row }">
+              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
+              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <template v-if="diff.cpus?.length">
+        <h4 class="section-title">CPU</h4>
+        <el-table :data="diff.cpus" border size="small">
+          <el-table-column prop="slot" label="槽位" width="110" />
+          <el-table-column label="类型" width="90">
+            <template #default="{ row }">
+              <el-tag :type="kindTag[row.kind]" size="small">
+                {{ kindLabel[row.kind] }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="变化" min-width="280">
+            <template #default="{ row }">
+              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
+              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
     </template>
     <el-empty v-else description="该记录无 diff 详情(历史数据)" :image-size="60" />
   </div>
@@ -38,7 +80,12 @@
 import { FieldDiff } from '../api'
 
 defineProps<{
-  diff: { fields: FieldDiff[]; nics: unknown[] } | null
+  diff: {
+    fields: FieldDiff[]
+    nics: unknown[]
+    memory?: unknown[]
+    cpus?: unknown[]
+  } | null
 }>()
 
 const kindLabel: Record<string, string> = {
@@ -52,7 +99,7 @@ const kindTag: Record<string, string> = {
   changed: 'warning',
 }
 const emptyHint: Record<string, string> = {
-  added: '新网卡,无字段变化',
+  added: '新增,无字段变化',
   removed: '库中多出,裁决 new 即删除',
   changed: '-',
 }

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlmodel import Session, select
 
-from cmdb.models import Device, Nic, NicIP, PendingChange, to_naive_utc
+from cmdb.models import Cpu, Device, MemorySlot, Nic, NicIP, PendingChange, to_naive_utc
 from cmdb.schemas import DevicePush
 from cmdb.services.diff import diff_push, merge_diff
 
@@ -18,6 +18,8 @@ def build_snapshot(session: Session, device: Device) -> dict:
         "mgmt_ip": device.mgmt_ip,
         "mgmt_prefix_length": device.mgmt_prefix_length,
         "nics": {},
+        "memory": {},
+        "cpus": {},
     }
     for nic in nics:
         ips = session.exec(select(NicIP).where(NicIP.nic_id == nic.id)).all()
@@ -26,6 +28,18 @@ def build_snapshot(session: Session, device: Device) -> dict:
             "mac": nic.mac,
             "ips": {nip.ip: nip.prefix_length for nip in ips},
         }
+    for mem in session.exec(select(MemorySlot).where(MemorySlot.device_id == device.id)):
+        snapshot["memory"][mem.slot] = {
+            "slot": mem.slot,
+            "manufacturer": mem.manufacturer,
+            "part_number": mem.part_number,
+            "type": mem.type,
+            "size_gb": mem.size_gb,
+            "speed_mts": mem.speed_mts,
+            "serial_number": mem.serial_number,
+        }
+    for cpu in session.exec(select(Cpu).where(Cpu.device_id == device.id)):
+        snapshot["cpus"][cpu.slot] = {"slot": cpu.slot, "model": cpu.model}
     return snapshot
 
 
@@ -83,6 +97,12 @@ def _create_device(session: Session, push: DevicePush, received_at: datetime) ->
 
     for nic in push.nics:
         _create_nic(session, device.id, nic)
+    if push.memory:
+        for mem in push.memory.slots:
+            session.add(MemorySlot(device_id=device.id, **mem.model_dump()))
+    if push.cpus:
+        for cpu in push.cpus:
+            session.add(Cpu(device_id=device.id, **cpu.model_dump()))
     session.commit()
     session.refresh(device)
     return device

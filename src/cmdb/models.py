@@ -56,6 +56,33 @@ class NicIP(SQLModel, table=True):
     prefix_length: int | None = None
 
 
+class MemorySlot(SQLModel, table=True):
+    """内存槽位表,slot 为身份(device 内唯一),如 DIMM_A1。"""
+
+    __table_args__ = (UniqueConstraint("device_id", "slot"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    device_id: int = Field(foreign_key="device.id", index=True)
+    slot: str
+    manufacturer: str | None = None
+    part_number: str | None = None
+    type: str | None = None
+    size_gb: int | None = None
+    speed_mts: int | None = None
+    serial_number: str | None = None
+
+
+class Cpu(SQLModel, table=True):
+    """CPU 槽位表,slot 为身份(device 内唯一),如 CPU0。"""
+
+    __table_args__ = (UniqueConstraint("device_id", "slot"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    device_id: int = Field(foreign_key="device.id", index=True)
+    slot: str
+    model: str | None = None
+
+
 class PendingChange(SQLModel, table=True):
     """冲突待裁决,同一设备仅一条 pending,新推送合并进同一条。"""
 

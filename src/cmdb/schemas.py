@@ -28,17 +28,44 @@ class NicIn(BaseModel):
     ips: list[NicIPIn] = []
 
 
+class MemorySlotIn(BaseModel):
+    """推送体中的单条内存,slot 为身份,如 DIMM_A1。"""
+
+    slot: str
+    manufacturer: str | None = None
+    part_number: str | None = None
+    type: str | None = None
+    size_gb: int | None = None
+    speed_mts: int | None = None
+    serial_number: str | None = None
+
+
+class MemoryInfo(BaseModel):
+    """推送体中的内存信息。"""
+
+    slots: list[MemorySlotIn] = []
+
+
+class CpuSlotIn(BaseModel):
+    """推送体中的单颗 CPU,slot 为身份,如 CPU0。"""
+
+    slot: str
+    model: str | None = None
+
+
 class DevicePush(BaseModel):
     """采集推送体:POST /api/v1/devices 的 body。
 
     timestamp 缺省时由服务器接收时间兜底;full_sync=true 表示全量同步,
-    库中多出的网卡进 diff 候删。
+    库中多出的网卡/内存/CPU 进 diff 候删。
     """
 
     hostname: str
     serial_number: str | None = None
     mgmt: MgmtInfo = MgmtInfo()
     nics: list[NicIn] = []
+    memory: MemoryInfo | None = None
+    cpus: list[CpuSlotIn] | None = None
     timestamp: datetime | None = None
     full_sync: bool = False
     source: str | None = None
@@ -46,6 +73,18 @@ class DevicePush(BaseModel):
 
 class NicIPOut(NicIPIn):
     """响应中的 IP(含 id)。"""
+
+    id: int
+
+
+class MemorySlotOut(MemorySlotIn):
+    """响应中的内存槽位(含 id)。"""
+
+    id: int
+
+
+class CpuSlotOut(CpuSlotIn):
+    """响应中的 CPU 槽位(含 id)。"""
 
     id: int
 
@@ -75,6 +114,8 @@ class DeviceOut(BaseModel):
     status: str
     tags: list[str] = []
     nics: list[NicOut] = []
+    memory: list[MemorySlotOut] = []
+    cpus: list[CpuSlotOut] = []
 
 
 class DeviceCreatedOut(BaseModel):
@@ -89,11 +130,13 @@ class DeviceCreatedOut(BaseModel):
 class ResolutionIn(BaseModel):
     """裁决请求体:每条 diff 条目选 "new"(采用新数据)或 "old"(保留现状)。
 
-    对 removed 网卡,"new" 即删除该网卡。
+    对 removed 网卡/内存槽位,"new" 即删除该条目。
     """
 
     field_choices: dict[str, str] = {}
     nic_choices: dict[str, str] = {}
+    memory_choices: dict[str, str] = {}
+    cpu_choices: dict[str, str] = {}
 
 
 class TagUpdate(BaseModel):

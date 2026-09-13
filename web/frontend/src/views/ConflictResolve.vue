@@ -76,7 +76,70 @@
           </el-radio-group>
         </el-card>
 
-        <div class="actions" v-if="pending.diff.fields.length || pending.diff.nics.length">
+        <el-card class="card" v-for="entry in pending.diff.memory" :key="entry.slot">
+          <template #header>
+            内存 {{ entry.slot }}
+            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
+              {{ kindLabel[entry.kind] }}
+            </el-tag>
+          </template>
+
+          <el-descriptions :column="1" border class="nic-detail">
+            <el-descriptions-item v-if="entry.old" label="旧状态">
+              {{ memoryRepr(entry.old) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="entry.new" label="新状态">
+              {{ memoryRepr(entry.new) }}
+            </el-descriptions-item>
+            <el-descriptions-item
+              v-for="(change, i) in entry.changes"
+              :key="i"
+              :label="change.field"
+            >
+              {{ change.old }} -> {{ change.new }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-radio-group v-model="memoryChoices[entry.slot]" class="nic-choice">
+            <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
+            <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
+          </el-radio-group>
+        </el-card>
+
+        <el-card class="card" v-for="entry in pending.diff.cpus" :key="entry.slot">
+          <template #header>
+            CPU {{ entry.slot }}
+            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
+              {{ kindLabel[entry.kind] }}
+            </el-tag>
+          </template>
+
+          <el-descriptions :column="1" border class="nic-detail">
+            <el-descriptions-item v-if="entry.old" label="旧状态">
+              {{ entry.old?.model ?? '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="entry.new" label="新状态">
+              {{ entry.new?.model ?? '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item
+              v-for="(change, i) in entry.changes"
+              :key="i"
+              :label="change.field"
+            >
+              {{ change.old }} -> {{ change.new }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-radio-group v-model="cpuChoices[entry.slot]" class="nic-choice">
+            <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
+            <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
+          </el-radio-group>
+        </el-card>
+
+        <div
+          class="actions"
+          v-if="pending.diff.fields.length || pending.diff.nics.length || pending.diff.memory?.length || pending.diff.cpus?.length"
+        >
           <el-button type="primary" :loading="resolving" @click="submit">
             提交裁决
           </el-button>
@@ -102,6 +165,8 @@ const pendings = ref<PendingChange[]>([])
 const pending = ref<PendingChange | null>(null)
 const fieldChoices = ref<Record<string, string>>({})
 const nicChoices = ref<Record<string, string>>({})
+const memoryChoices = ref<Record<string, string>>({})
+const cpuChoices = ref<Record<string, string>>({})
 const listLoading = ref(false)
 const resolving = ref(false)
 const tableRef = ref<TableInstance>()
@@ -152,6 +217,27 @@ const kindNewLabel: Record<string, string> = {
   removed: '删除该网卡',
   changed: '采用新值',
 }
+const memoryOldLabel: Record<string, string> = {
+  added: '丢弃(不新增)',
+  removed: '保留(不删除)',
+  changed: '保留旧值',
+}
+const memoryNewLabel: Record<string, string> = {
+  added: '新增该内存',
+  removed: '删除该内存',
+  changed: '采用新值',
+}
+
+function memoryRepr(m: Record<string, unknown>): string {
+  const parts: string[] = []
+  if (m.manufacturer) parts.push(String(m.manufacturer))
+  if (m.part_number) parts.push(String(m.part_number))
+  if (m.type) parts.push(String(m.type))
+  if (m.size_gb) parts.push(`${m.size_gb}GB`)
+  if (m.speed_mts) parts.push(`${m.speed_mts}MT/s`)
+  if (m.serial_number) parts.push(`SN:${m.serial_number}`)
+  return parts.length ? parts.join(' ') : '-'
+}
 
 function fmt(ts: string): string {
   // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
@@ -192,9 +278,13 @@ function selectPending(row: PendingChange | null) {
   // 默认全部采用新值,用户可逐条改为保留旧值
   fieldChoices.value = {}
   nicChoices.value = {}
+  memoryChoices.value = {}
+  cpuChoices.value = {}
   if (row) {
     for (const f of row.diff.fields) fieldChoices.value[f.field] = 'new'
     for (const n of row.diff.nics) nicChoices.value[n.name] = 'new'
+    for (const m of row.diff.memory ?? []) memoryChoices.value[m.slot] = 'new'
+    for (const c of row.diff.cpus ?? []) cpuChoices.value[c.slot] = 'new'
   }
 }
 
@@ -208,6 +298,8 @@ async function submit() {
     const res = await api.resolve(resolvedId, {
       field_choices: fieldChoices.value,
       nic_choices: nicChoices.value,
+      memory_choices: memoryChoices.value,
+      cpu_choices: cpuChoices.value,
     })
     ElMessage.success(
       res.applied.length

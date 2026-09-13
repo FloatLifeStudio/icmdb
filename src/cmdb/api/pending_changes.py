@@ -43,5 +43,12 @@ def resolve_pending_change(
         raise HTTPException(
             status_code=409, detail=f"already resolved: {pending.status}"
         )
-    result = apply_resolution(session, pending, body.field_choices, body.nic_choices)
+    result = apply_resolution(
+        session,
+        pending,
+        body.field_choices,
+        body.nic_choices,
+        body.memory_choices,
+        body.cpu_choices,
+    )
     return {"applied": result["applied"], "pending_id": pending.id, "status": "applied"}

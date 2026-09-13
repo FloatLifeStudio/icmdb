@@ -13,7 +13,16 @@
 
 from sqlmodel import Session, select
 
-from cmdb.models import ChangeHistory, Device, Nic, NicIP, PendingChange, utcnow
+from cmdb.models import (
+    ChangeHistory,
+    Cpu,
+    Device,
+    MemorySlot,
+    Nic,
+    NicIP,
+    PendingChange,
+    utcnow,
+)
 
 # 主机字段路径 -> Device 属性
 _FIELD_ATTRS = {
@@ -22,6 +31,86 @@ _FIELD_ATTRS = {
     "mgmt.ip": "mgmt_ip",
     "mgmt.prefix_length": "mgmt_prefix_length",
 }
+
+
+_MEMORY_FIELDS = (
+    "manufacturer",
+    "part_number",
+    "type",
+    "size_gb",
+    "speed_mts",
+    "serial_number",
+)
+
+
+def _apply_memory(session: Session, device: Device, entry: dict) -> None:
+    """按裁决结果处理单个内存槽位条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    slot = entry["slot"]
+    existing = session.exec(
+        select(MemorySlot).where(
+            MemorySlot.device_id == device.id, MemorySlot.slot == slot
+        )
+    ).first()
+
+    if entry["kind"] == "added":
+        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+            return
+        new = entry["new"]
+        session.add(
+            MemorySlot(
+                device_id=device.id,
+                slot=slot,
+                manufacturer=new.get("manufacturer"),
+                part_number=new.get("part_number"),
+                type=new.get("type"),
+                size_gb=new.get("size_gb"),
+                speed_mts=new.get("speed_mts"),
+                serial_number=new.get("serial_number"),
+            )
+        )
+        return
+
+    if entry["kind"] == "removed":
+        if existing is None:
+            return
+        session.delete(existing)
+        return
+
+    # kind == changed
+    if existing is None:
+        return
+    for change in entry.get("changes", []):
+        if change["field"] in _MEMORY_FIELDS:
+            setattr(existing, change["field"], change["new"])
+
+
+def _apply_cpu(session: Session, device: Device, entry: dict) -> None:
+    """按裁决结果处理单个 CPU 槽位条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    slot = entry["slot"]
+    existing = session.exec(
+        select(Cpu).where(Cpu.device_id == device.id, Cpu.slot == slot)
+    ).first()
+
+    if entry["kind"] == "added":
+        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+            return
+        session.add(
+            Cpu(device_id=device.id, slot=slot, model=entry["new"].get("model"))
+        )
+        return
+
+    if entry["kind"] == "removed":
+        if existing is None:
+            return
+        session.delete(existing)
+        return
+
+    # kind == changed
+    if existing is None:
+        return
+    for change in entry.get("changes", []):
+        if change["field"] == "model":
+            existing.model = change["new"]
 
 
 def _apply_nic(session: Session, device: Device, entry: dict) -> None:
@@ -75,6 +164,8 @@ def apply_resolution(
     pending: PendingChange,
     field_choices: dict[str, str],
     nic_choices: dict[str, str],
+    memory_choices: dict[str, str] | None = None,
+    cpu_choices: dict[str, str] | None = None,
 ) -> dict:
     """应用裁决:选择 new 的条目生效,选择 old 的保留现状。
 
@@ -117,6 +208,38 @@ def apply_resolution(
                         f"{[ip['ip'] for ip in change['new']]}"
                     )
         _apply_nic(session, device, entry)
+
+    for entry in pending.diff.get("memory", []):
+        choice = (memory_choices or {}).get(entry["slot"])
+        if choice != "new":
+            continue
+        if entry["kind"] == "added":
+            summaries.append(f"内存 {entry['slot']} 新增")
+        elif entry["kind"] == "removed":
+            summaries.append(f"内存 {entry['slot']} 删除")
+        else:
+            for change in entry.get("changes", []):
+                summaries.append(
+                    f"内存 {entry['slot']} {change['field']}: "
+                    f"{change['old']} -> {change['new']}"
+                )
+        _apply_memory(session, device, entry)
+
+    for entry in pending.diff.get("cpus", []):
+        choice = (cpu_choices or {}).get(entry["slot"])
+        if choice != "new":
+            continue
+        if entry["kind"] == "added":
+            summaries.append(f"CPU {entry['slot']} 新增")
+        elif entry["kind"] == "removed":
+            summaries.append(f"CPU {entry['slot']} 删除")
+        else:
+            for change in entry.get("changes", []):
+                summaries.append(
+                    f"CPU {entry['slot']} {change['field']}: "
+                    f"{change['old']} -> {change['new']}"
+                )
+        _apply_cpu(session, device, entry)
 
     pending.status = "applied"
     pending.resolved_at = utcnow()
