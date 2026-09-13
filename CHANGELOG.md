@@ -2,6 +2,27 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/),版本号遵循语义化版本。
 
+## v2.2.0 - 2026-09-13
+
+### 新增
+
+- **推送格式重设计**:`agent` / `os` / `mgmt` / `hardware` 四段结构
+  (`agent`: version/source/timestamp/full_sync;`hardware`: chassis_serial_number +
+  各硬件类别);仅含顶层 hostname 的旧格式服务端自动归一化兼容
+- **GPU 支持**:新 GPU 表(`uuid` 为身份:名称/SN/显存/驱动版本/PCIe),
+  推送、diff 裁决、存储、展示全链路覆盖;diff 条目补全整体 old/new
+- **用户登录**:单管理员账号(env 配置)保护 UI 及其调用的 API;
+  前端登录页 + 路由守卫;`POST /devices` 推送接口不鉴权,采集器无需改造
+- **备份脚本**:`scripts/backup_db.py` 用 `VACUUM INTO` 生成一致性快照,保留 14 份,可挂 cron
+
+### 优化
+
+- **多次推送以最新为准**:同设备未裁决时以最新一次推送重算 diff 整体替换,不累计
+- **冲突裁决两列对比**:硬件条目改为主机字段一致的旧值(库中)/新值(推送)两列
+- 内存容量改 `size` + `size_unit`(JSON 对齐),内部归一化 `size_gb` 列;旧库自动迁移
+- 标签规范化为 device_tag 表;列表查询 N+1 修复;搜索防抖;CSV 导入修复
+- 示例数据改为高性能双路八卡 GPU 服务器常用配置(2× Xeon Platinum、16× 32GB DDR5、8× A800-80GB)
+
 ## v2.1.0 - 2026-09-13
 
 ### 新增

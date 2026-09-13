@@ -16,7 +16,7 @@ CMDB(CMDB v2)—— 采集推送、字段级 diff 冲突裁决、存储与展示
 - **疑似下线**:查询时动态计算,默认 3 天阈值(`CMDB_OFFLINE_THRESHOLD_DAYS` 可配),数据不自动删
 - **UI 写入权限**:推送 API 为唯一数据写入入口,UI 只读 + 裁决
 - **登录**:单管理员账号(env 配置)保护 UI 及其调用的 API;推送接口不鉴权,采集器无需改造
-- **删除语义**:DELETE 硬删设备与网卡数据,change_history 保留(追溯价值)
+- **删除语义**:DELETE 硬删设备与网卡、内存、CPU、硬盘、电源、GPU 数据,change_history 保留(追溯价值)
 
 ## 技术栈
 
@@ -57,6 +57,10 @@ uv run pytest tests/ -v
 | `CMDB_DB_PATH` | `cmdb.db` | SQLite 数据库文件路径 |
 | `CMDB_OFFLINE_THRESHOLD_DAYS` | `3` | 疑似下线阈值(天) |
 | `CMDB_STATIC_DIR` | `src/cmdb/static` | 前端构建产物目录 |
+| `CMDB_ADMIN_USER` | `admin` | 登录用户名 |
+| `CMDB_ADMIN_PASSWORD` | `admin` | 登录密码 |
+| `CMDB_SECRET_KEY` | `cmdb-session-secret` | 会话 cookie 签名密钥 |
+| `CMDB_SESSION_EXPIRE_DAYS` | `7` | 会话有效期(天) |
 
 ## 文档
 

@@ -6,7 +6,7 @@
     "full_sync": true
   },
   "os": {
-    "hostname": "S1A01DC-VL101",
+    "hostname": "S1A01DC-GPU01",
     "type": "Linux",
     "version": "Ubuntu 22.04",
     "kernel": "5.15.0-91-generic"
@@ -22,17 +22,42 @@
       {
         "name": "eth0",
         "mac": "AA:BB:CC:DD:EE:02",
-        "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]
+        "ips": [
+          {
+            "ip": "10.10.1.101",
+            "prefix_length": 24
+          }
+        ]
       },
       {
         "name": "eth1",
         "mac": "AA:BB:CC:DD:EE:03",
-        "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
+        "ips": [
+          {
+            "ip": "10.10.2.101",
+            "prefix_length": 24
+          }
+        ]
       },
       {
         "name": "eth2",
         "mac": "AA:BB:CC:DD:EE:04",
-        "ips": [{"ip": "10.10.3.101", "prefix_length": 24}]
+        "ips": [
+          {
+            "ip": "10.10.3.101",
+            "prefix_length": 24
+          }
+        ]
+      },
+      {
+        "name": "eth3",
+        "mac": "AA:BB:CC:DD:EE:05",
+        "ips": [
+          {
+            "ip": "10.10.4.101",
+            "prefix_length": 24
+          }
+        ]
       }
     ],
     "memory": {
@@ -42,112 +67,278 @@
           "manufacturer": "Samsung",
           "part_number": "M321R8GA0BB0-CQKZJ",
           "type": "DDR5",
-          "size": 64,
+          "size": 32,
           "size_unit": "GB",
           "speed_mts": 4800,
-          "serial_number": "123123456"
+          "serial_number": "SN123A01"
         },
         {
           "slot": "DIMM_A2",
           "manufacturer": "Samsung",
           "part_number": "M321R8GA0BB0-CQKZJ",
           "type": "DDR5",
-          "size": 64,
+          "size": 32,
           "size_unit": "GB",
           "speed_mts": 4800,
-          "serial_number": "123123457"
+          "serial_number": "SN123A02"
         },
         {
-          "slot": "DIMM_B1",
-          "manufacturer": "Kingston",
-          "part_number": "KSM56R46BD4PMI-32HAI",
+          "slot": "DIMM_A3",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
           "type": "DDR5",
           "size": 32,
           "size_unit": "GB",
           "speed_mts": 4800,
-          "serial_number": "123123458"
+          "serial_number": "SN123A03"
+        },
+        {
+          "slot": "DIMM_A4",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123A04"
+        },
+        {
+          "slot": "DIMM_A5",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123A05"
+        },
+        {
+          "slot": "DIMM_A6",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123A06"
+        },
+        {
+          "slot": "DIMM_A7",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123A07"
+        },
+        {
+          "slot": "DIMM_A8",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123A08"
+        },
+        {
+          "slot": "DIMM_B1",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123B01"
+        },
+        {
+          "slot": "DIMM_B2",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123B02"
+        },
+        {
+          "slot": "DIMM_B3",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123B03"
+        },
+        {
+          "slot": "DIMM_B4",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123B04"
+        },
+        {
+          "slot": "DIMM_B5",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123B05"
+        },
+        {
+          "slot": "DIMM_B6",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123B06"
+        },
+        {
+          "slot": "DIMM_B7",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123B07"
+        },
+        {
+          "slot": "DIMM_B8",
+          "manufacturer": "Samsung",
+          "part_number": "M321R8GA0BB0-CQKZJ",
+          "type": "DDR5",
+          "size": 32,
+          "size_unit": "GB",
+          "speed_mts": 4800,
+          "serial_number": "SN123B08"
         }
       ]
     },
     "cpus": [
-      {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
-      {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"},
-      {"slot": "CPU2", "model": "Intel(R) Xeon(R) Gold 6448Y"}
+      {
+        "slot": "CPU0",
+        "model": "Intel(R) Xeon(R) Platinum 8470"
+      },
+      {
+        "slot": "CPU1",
+        "model": "Intel(R) Xeon(R) Platinum 8470"
+      }
     ],
     "disks": [
       {
-        "serial_number": "123123123",
+        "serial_number": "S4AABC123456",
         "type": "SSD",
         "manufacturer": "Samsung",
-        "model": "990EVO",
-        "size": 8,
-        "size_unit": "TB"
+        "model": "PM1733a",
+        "size": 1920,
+        "size_unit": "GB"
       },
       {
-        "serial_number": "123123124",
+        "serial_number": "S4AABC123457",
         "type": "SSD",
         "manufacturer": "Samsung",
-        "model": "990EVO",
-        "size": 8,
-        "size_unit": "TB"
-      },
-      {
-        "serial_number": "123456",
-        "type": "HDD",
-        "manufacturer": "HGST",
-        "model": "HUH728080ALE604",
-        "size": 8,
-        "size_unit": "TB"
+        "model": "PM1733a",
+        "size": 1920,
+        "size_unit": "GB"
       }
     ],
     "psus": [
       {
         "serial_number": "2P0123123132",
         "manufacturer": "GreatWall",
-        "model": "CRPS2700D2",
-        "max_power_w": 2700
+        "model": "CRPS3000D",
+        "max_power_w": 3000
       },
       {
         "serial_number": "2P0123123133",
         "manufacturer": "GreatWall",
-        "model": "CRPS2700D2",
-        "max_power_w": 2700
-      },
-      {
-        "serial_number": "2P0123123134",
-        "manufacturer": "GreatWall",
-        "model": "CRPS2700D2",
-        "max_power_w": 2700
+        "model": "CRPS3000D",
+        "max_power_w": 3000
       }
     ],
     "gpu": {
       "slots": [
         {
-          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-9a1b2c3d4e5f",
-          "name": "NVIDIA GeForce RTX 4090",
-          "serial_number": "G123456",
-          "size": 24,
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-000000000000",
+          "name": "NVIDIA A800-SXM4-80GB",
+          "serial_number": "G123450",
+          "size": 80,
           "size_unit": "GB",
           "driver_version": "550.54.14",
           "pcie_id": "0000:3b:00.0"
         },
         {
-          "uuid": "GPU-5a4b3c2d-1e6f-4a5b-8c9d-0e1f2a3b4c5d",
-          "name": "NVIDIA GeForce RTX 4090",
-          "serial_number": "G123457",
-          "size": 24,
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-000000000001",
+          "name": "NVIDIA A800-SXM4-80GB",
+          "serial_number": "G123451",
+          "size": 80,
           "size_unit": "GB",
           "driver_version": "550.54.14",
           "pcie_id": "0000:5c:00.0"
         },
         {
-          "uuid": "GPU-7c8d9e0f-1a2b-4c3d-8e5f-6a7b8c9d0e1f",
-          "name": "NVIDIA A100-SXM4-80GB",
-          "serial_number": "G123458",
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-000000000002",
+          "name": "NVIDIA A800-SXM4-80GB",
+          "serial_number": "G123452",
           "size": 80,
           "size_unit": "GB",
           "driver_version": "550.54.14",
-          "pcie_id": "0000:8d:00.0"
+          "pcie_id": "0000:86:00.0"
+        },
+        {
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-000000000003",
+          "name": "NVIDIA A800-SXM4-80GB",
+          "serial_number": "G123453",
+          "size": 80,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:9a:00.0"
+        },
+        {
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-000000000004",
+          "name": "NVIDIA A800-SXM4-80GB",
+          "serial_number": "G123454",
+          "size": 80,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:ab:00.0"
+        },
+        {
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-000000000005",
+          "name": "NVIDIA A800-SXM4-80GB",
+          "serial_number": "G123455",
+          "size": 80,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:af:00.0"
+        },
+        {
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-000000000006",
+          "name": "NVIDIA A800-SXM4-80GB",
+          "serial_number": "G123456",
+          "size": 80,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:b3:00.0"
+        },
+        {
+          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-000000000007",
+          "name": "NVIDIA A800-SXM4-80GB",
+          "serial_number": "G123457",
+          "size": 80,
+          "size_unit": "GB",
+          "driver_version": "550.54.14",
+          "pcie_id": "0000:d8:00.0"
         }
       ]
     }
