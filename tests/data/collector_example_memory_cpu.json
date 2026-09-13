@@ -53,6 +53,38 @@
     {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
     {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
   ],
+  "disks": [
+    {
+      "serial_number": "123123123",
+      "type": "SSD",
+      "manufacturer": "Samsung",
+      "model": "990EVO",
+      "size": 8,
+      "size_unit": "TB"
+    },
+    {
+      "serial_number": "123456",
+      "type": "HDD",
+      "manufacturer": "HGST",
+      "model": "HUH728080ALE604",
+      "size": 8,
+      "size_unit": "TB"
+    }
+  ],
+  "psus": [
+    {
+      "serial_number": "2P0123123132",
+      "manufacturer": "GreatWall",
+      "model": "CRPS2700D2",
+      "max_power_w": 2700
+    },
+    {
+      "serial_number": "2P0123123133",
+      "manufacturer": "GreatWall",
+      "model": "CRPS2700D2",
+      "max_power_w": 2700
+    }
+  ],
   "timestamp": "2026-09-13T10:00:00+08:00",
   "full_sync": true,
   "source": "collector"
