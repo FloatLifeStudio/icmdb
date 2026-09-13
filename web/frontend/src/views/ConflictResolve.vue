@@ -231,9 +231,12 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, TableInstance } from 'element-plus'
 import { api, NicDiff, PendingChange } from '../api'
+
+// 裁决提交成功后通知侧边栏气泡立即刷新
+const refreshPendingCount = inject<() => void>('refreshPendingCount', () => {})
 
 const pendings = ref<PendingChange[]>([])
 const pending = ref<PendingChange | null>(null)
@@ -411,6 +414,7 @@ async function submit() {
         : '裁决已提交(保留现状,无实际改动)'
     )
     await load()
+    refreshPendingCount()
     // 自动切换到下一条:同一位置(即原下一条);裁决的是最后一条则回到列表开头
     const rest = pendings.value
     const next = rest.length ? rest[idx % rest.length] : null

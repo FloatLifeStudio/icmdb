@@ -11,14 +11,15 @@
         </el-menu-item>
         <el-menu-item index="/conflicts">
           <el-icon><EditPen /></el-icon>
-          <span class="menu-item-label">冲突裁决</span>
           <el-badge
-            v-if="pendingCount"
             :value="pendingCount"
             :max="99"
             type="danger"
+            :hidden="!pendingCount"
             class="menu-badge"
-          />
+          >
+            <span>冲突裁决</span>
+          </el-badge>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -29,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Monitor, EditPen, Odometer } from '@element-plus/icons-vue'
 import { api } from './api'
@@ -37,7 +38,7 @@ import { api } from './api'
 const route = useRoute()
 const pendingCount = ref(0)
 
-// 待裁决数量气泡:进入应用与切换页面时刷新
+// 待裁决数量气泡:进入应用、切换页面时刷新(裁决提交后由 ConflictResolve 调 loadPendingCount)
 async function loadPendingCount() {
   try {
     const res = await api.dashboard()
@@ -49,6 +50,7 @@ async function loadPendingCount() {
 
 watch(() => route.path, loadPendingCount)
 loadPendingCount()
+provide('refreshPendingCount', loadPendingCount)
 </script>
 
 <style scoped>
@@ -70,8 +72,10 @@ loadPendingCount()
 .menu-item-label {
   flex: 1;
 }
-.menu-badge {
-  margin-left: auto;
+.menu-badge :deep(.el-badge__content) {
+  position: static;
+  transform: none;
+  margin-left: 4px;
 }
 .main {
   background: var(--el-bg-color-page);

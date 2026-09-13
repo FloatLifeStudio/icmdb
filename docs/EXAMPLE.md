@@ -101,21 +101,11 @@
 
 ## 字段说明
 
-| 字段 | 必填 | 说明 |
-|---|---|---|
-| `hostname` | ✅ | 设备唯一匹配键 |
-| `serial_number` | ❌ | 设备序列号 |
-| `mgmt` | ❌ | 管理口:mac / ip / prefix_length |
-| `nics` | ❌ | 网卡数组,`name` 是身份 |
-| `memory.slots[]` | ❌ | 内存,`slot` 是身份;manufacturer / part_number(型号)/ type(代数)/ size_gb(理论容量 GB)/ speed_mts(频率 MT/s)/ serial_number |
-| `cpus[]` | ❌ | CPU,`slot` 是身份;model(型号) |
-| `disks[]` | ❌ | 硬盘,`serial_number` 是身份;type(SSD/HDD)/ manufacturer / model / size + size_unit(理论容量,GB 或 TB) |
-| `psus[]` | ❌ | 电源,`serial_number` 是身份;manufacturer / model / max_power_w(最大功率 W) |
-| `timestamp` | ❌ | 采集时间 ISO 8601(带时区),缺省用服务器接收时间 |
-| `full_sync` | ❌ | 默认 false。true = 全量同步:库中多出的网卡/内存/CPU/硬盘/电源进 diff 候删 |
-| `source` | ❌ | 来源标识,写入待裁决记录与变更历史 |
+各字段含义与必填性见 [API.md](./API.md#1-采集推送) 的字段说明表,此处只列要点:
 
-所有硬件数组均可选,不推不影响现有推送;顶层 `memory` / `cpus` / `disks` / `psus` 缺省即不更新对应类别。
+- `hostname` 是设备唯一匹配键;各硬件条目的身份:网卡 `name`、内存/CPU `slot`、硬盘/电源 `serial_number`
+- 所有硬件数组均可选,不推不影响现有推送;顶层 `memory` / `cpus` / `disks` / `psus` 缺省即不更新对应类别
+- `full_sync=true` = 全量同步:库中多出的网卡/内存/CPU/硬盘/电源进 diff 候删
 
 ## 推送命令
 
