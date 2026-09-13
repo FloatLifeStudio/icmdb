@@ -11,15 +11,10 @@
         </el-menu-item>
         <el-menu-item index="/conflicts">
           <el-icon><EditPen /></el-icon>
-          <el-badge
-            :value="pendingCount"
-            :max="99"
-            type="danger"
-            :hidden="!pendingCount"
-            class="menu-badge"
-          >
-            <span>冲突裁决</span>
-          </el-badge>
+          <span>冲突裁决</span>
+          <span v-if="pendingCount" class="pending-count">
+            {{ pendingCount > 99 ? '99+' : pendingCount }}
+          </span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -72,10 +67,16 @@ provide('refreshPendingCount', loadPendingCount)
 .menu-item-label {
   flex: 1;
 }
-.menu-badge :deep(.el-badge__content) {
-  /* 恢复默认角标定位:贴在文字右上角 */
-  position: absolute;
-  transform: translateY(-50%) translateX(100%);
+.pending-count {
+  margin-left: 6px;
+  background: var(--el-color-danger);
+  color: #fff;
+  border-radius: 9px;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 .main {
   background: var(--el-bg-color-page);
