@@ -34,6 +34,12 @@ _engine = None
 # 注意表名是 SQLModel 默认的类名小写:device / changehistory
 _MIGRATIONS = {
     "changehistory": {"diff": "JSON"},
+    "device": {
+        "os_type": "VARCHAR",
+        "os_version": "VARCHAR",
+        "kernel": "VARCHAR",
+        "agent_version": "VARCHAR",
+    },
 }
 
 
