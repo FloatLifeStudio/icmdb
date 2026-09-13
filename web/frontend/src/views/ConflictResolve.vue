@@ -131,8 +131,8 @@
           </el-descriptions>
 
           <el-radio-group v-model="cpuChoices[entry.slot!]" class="nic-choice">
-            <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
-            <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
+            <el-radio value="old">{{ cpuOldLabel[entry.kind] }}</el-radio>
+            <el-radio value="new">{{ cpuNewLabel[entry.kind] }}</el-radio>
           </el-radio-group>
         </el-card>
 
@@ -168,8 +168,8 @@
             v-model="diskChoices[entry.serial_number!]"
             class="nic-choice"
           >
-            <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
-            <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
+            <el-radio value="old">{{ diskOldLabel[entry.kind] }}</el-radio>
+            <el-radio value="new">{{ diskNewLabel[entry.kind] }}</el-radio>
           </el-radio-group>
         </el-card>
 
@@ -205,8 +205,8 @@
             v-model="psuChoices[entry.serial_number!]"
             class="nic-choice"
           >
-            <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
-            <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
+            <el-radio value="old">{{ psuOldLabel[entry.kind] }}</el-radio>
+            <el-radio value="new">{{ psuNewLabel[entry.kind] }}</el-radio>
           </el-radio-group>
         </el-card>
 
@@ -305,6 +305,36 @@ const memoryOldLabel: Record<string, string> = {
 const memoryNewLabel: Record<string, string> = {
   added: '新增该内存',
   removed: '删除该内存',
+  changed: '采用新值',
+}
+const cpuOldLabel: Record<string, string> = {
+  added: '丢弃(不新增)',
+  removed: '保留(不删除)',
+  changed: '保留旧值',
+}
+const cpuNewLabel: Record<string, string> = {
+  added: '新增该 CPU',
+  removed: '删除该 CPU',
+  changed: '采用新值',
+}
+const diskOldLabel: Record<string, string> = {
+  added: '丢弃(不新增)',
+  removed: '保留(不删除)',
+  changed: '保留旧值',
+}
+const diskNewLabel: Record<string, string> = {
+  added: '新增该硬盘',
+  removed: '删除该硬盘',
+  changed: '采用新值',
+}
+const psuOldLabel: Record<string, string> = {
+  added: '丢弃(不新增)',
+  removed: '保留(不删除)',
+  changed: '保留旧值',
+}
+const psuNewLabel: Record<string, string> = {
+  added: '新增该电源',
+  removed: '删除该电源',
   changed: '采用新值',
 }
 
