@@ -1,7 +1,7 @@
 <template>
   <div class="diff-detail">
     <template
-      v-if="diff && (diff.fields.length || diff.nics.length || diff.memory?.length || diff.cpus?.length)"
+      v-if="diff && (diff.fields.length || diff.nics.length || diff.memory?.length || diff.cpus?.length || diff.disks?.length || diff.psus?.length)"
     >
       <h4 class="section-title">主机字段</h4>
       <el-table :data="diff.fields" border size="small">
@@ -71,6 +71,46 @@
           </el-table-column>
         </el-table>
       </template>
+
+      <template v-if="diff.disks?.length">
+        <h4 class="section-title">硬盘</h4>
+        <el-table :data="diff.disks" border size="small">
+          <el-table-column prop="serial_number" label="SN" width="130" />
+          <el-table-column label="类型" width="90">
+            <template #default="{ row }">
+              <el-tag :type="kindTag[row.kind]" size="small">
+                {{ kindLabel[row.kind] }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="变化" min-width="280">
+            <template #default="{ row }">
+              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
+              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <template v-if="diff.psus?.length">
+        <h4 class="section-title">电源</h4>
+        <el-table :data="diff.psus" border size="small">
+          <el-table-column prop="serial_number" label="SN" width="130" />
+          <el-table-column label="类型" width="90">
+            <template #default="{ row }">
+              <el-tag :type="kindTag[row.kind]" size="small">
+                {{ kindLabel[row.kind] }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="变化" min-width="280">
+            <template #default="{ row }">
+              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
+              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
     </template>
     <el-empty v-else description="该记录无 diff 详情(历史数据)" :image-size="60" />
   </div>
@@ -85,6 +125,8 @@ defineProps<{
     nics: unknown[]
     memory?: unknown[]
     cpus?: unknown[]
+    disks?: unknown[]
+    psus?: unknown[]
   } | null
 }>()
 

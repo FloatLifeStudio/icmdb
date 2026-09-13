@@ -11,19 +11,21 @@ from sqlmodel import Session, select
 
 from cmdb.config import settings
 from cmdb.database import get_session
-from cmdb.models import Cpu, Device, MemorySlot, Nic, NicIP, PendingChange, utcnow
+from cmdb.models import Cpu, Device, Disk, MemorySlot, Nic, NicIP, PendingChange, Psu, utcnow
 from cmdb.schemas import (
     BatchDeleteIn,
     CpuSlotOut,
     DeviceCreatedOut,
     DeviceOut,
     DevicePush,
+    DiskOut,
     MgmtInfo,
     MemorySlotOut,
     NicIn,
     NicIPOut,
     NicOut,
     NicIPIn,
+    PsuOut,
     TagUpdate,
 )
 from cmdb.services.ingest import ingest_push
@@ -72,6 +74,10 @@ def _delete_device_children(session: Session, device_id: int) -> None:
         session.delete(mem)
     for cpu in session.exec(select(Cpu).where(Cpu.device_id == device_id)).all():
         session.delete(cpu)
+    for disk in session.exec(select(Disk).where(Disk.device_id == device_id)).all():
+        session.delete(disk)
+    for psu in session.exec(select(Psu).where(Psu.device_id == device_id)).all():
+        session.delete(psu)
     session.flush()
 
 
@@ -96,6 +102,8 @@ def _to_out(session: Session, device: Device) -> DeviceOut:
         select(MemorySlot).where(MemorySlot.device_id == device.id)
     ).all()
     cpus = session.exec(select(Cpu).where(Cpu.device_id == device.id)).all()
+    disks = session.exec(select(Disk).where(Disk.device_id == device.id)).all()
+    psus = session.exec(select(Psu).where(Psu.device_id == device.id)).all()
     return DeviceOut(
         id=device.id,
         hostname=device.hostname,
@@ -119,6 +127,22 @@ def _to_out(session: Session, device: Device) -> DeviceOut:
         ],
         cpus=[
             CpuSlotOut(id=c.id, slot=c.slot, model=c.model) for c in cpus
+        ],
+        disks=[
+            DiskOut(
+                id=d.id, serial_number=d.serial_number, type=d.type,
+                manufacturer=d.manufacturer, model=d.model,
+                size=d.size, size_unit=d.size_unit,
+            )
+            for d in disks
+        ],
+        psus=[
+            PsuOut(
+                id=p.id, serial_number=p.serial_number,
+                manufacturer=p.manufacturer, model=p.model,
+                max_power_w=p.max_power_w,
+            )
+            for p in psus
         ],
     )
 

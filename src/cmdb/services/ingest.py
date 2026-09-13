@@ -4,7 +4,17 @@ from datetime import datetime
 
 from sqlmodel import Session, select
 
-from cmdb.models import Cpu, Device, MemorySlot, Nic, NicIP, PendingChange, to_naive_utc
+from cmdb.models import (
+    Cpu,
+    Device,
+    Disk,
+    MemorySlot,
+    Nic,
+    NicIP,
+    PendingChange,
+    Psu,
+    to_naive_utc,
+)
 from cmdb.schemas import DevicePush
 from cmdb.services.diff import diff_push, merge_diff
 
@@ -20,6 +30,8 @@ def build_snapshot(session: Session, device: Device) -> dict:
         "nics": {},
         "memory": {},
         "cpus": {},
+        "disks": {},
+        "psus": {},
     }
     for nic in nics:
         ips = session.exec(select(NicIP).where(NicIP.nic_id == nic.id)).all()
@@ -40,6 +52,22 @@ def build_snapshot(session: Session, device: Device) -> dict:
         }
     for cpu in session.exec(select(Cpu).where(Cpu.device_id == device.id)):
         snapshot["cpus"][cpu.slot] = {"slot": cpu.slot, "model": cpu.model}
+    for disk in session.exec(select(Disk).where(Disk.device_id == device.id)):
+        snapshot["disks"][disk.serial_number] = {
+            "serial_number": disk.serial_number,
+            "type": disk.type,
+            "manufacturer": disk.manufacturer,
+            "model": disk.model,
+            "size": disk.size,
+            "size_unit": disk.size_unit,
+        }
+    for psu in session.exec(select(Psu).where(Psu.device_id == device.id)):
+        snapshot["psus"][psu.serial_number] = {
+            "serial_number": psu.serial_number,
+            "manufacturer": psu.manufacturer,
+            "model": psu.model,
+            "max_power_w": psu.max_power_w,
+        }
     return snapshot
 
 
@@ -103,6 +131,12 @@ def _create_device(session: Session, push: DevicePush, received_at: datetime) ->
     if push.cpus:
         for cpu in push.cpus:
             session.add(Cpu(device_id=device.id, **cpu.model_dump()))
+    if push.disks:
+        for disk in push.disks:
+            session.add(Disk(device_id=device.id, **disk.model_dump()))
+    if push.psus:
+        for psu in push.psus:
+            session.add(Psu(device_id=device.id, **psu.model_dump()))
     session.commit()
     session.refresh(device)
     return device

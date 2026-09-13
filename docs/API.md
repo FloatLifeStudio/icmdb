@@ -70,6 +70,16 @@
     {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
     {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
   ],
+  "disks": [
+    {"serial_number": "123123123", "type": "SSD", "manufacturer": "Samsung",
+     "model": "990EVO", "size": 8, "size_unit": "TB"},
+    {"serial_number": "123456", "type": "HDD", "manufacturer": "HGST",
+     "model": "HUH728080ALE604", "size": 8, "size_unit": "TB"}
+  ],
+  "psus": [
+    {"serial_number": "2P0123123132", "manufacturer": "GreatWall",
+     "model": "CRPS2700D2", "max_power_w": 2700}
+  ],
   "timestamp": "2026-09-11T15:30:00+08:00",
   "full_sync": true,
   "source": "collector"
@@ -86,6 +96,8 @@
 | `nics` | ❌ | 网卡数组,推多少收多少;`name` 是网卡身份 |
 | `memory` | ❌ | 内存信息:`slots` 数组,`slot` 是身份;字段含 manufacturer / part_number / type(代数)/ size_gb(理论容量 GB)/ speed_mts(MT/s)/ serial_number |
 | `cpus` | ❌ | CPU 数组,`slot` 是身份;字段含 model(型号) |
+| `disks` | ❌ | 硬盘数组,`serial_number` 是身份;字段含 type(SSD/HDD)/ manufacturer / model / size + size_unit(理论容量,GB 或 TB) |
+| `psus` | ❌ | 电源数组,`serial_number` 是身份;字段含 manufacturer / model / max_power_w(最大功率 W) |
 | `full_sync` | ❌ | 默认 false。**true = 全量同步**:库中多出的网卡/内存槽位/CPU 进 diff 候删;false = 增量:库中多出的保持不动 |
 | `timestamp` | ❌ | 采集时间 ISO 8601(带时区,会归一化为 UTC);缺省用服务器接收时间 |
 | `source` | ❌ | 来源标识,写入待裁决记录与变更历史 |
@@ -232,7 +244,7 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 | `removed` | full_sync=true 时库里多出的(候删) |
 | `changed` | 同名网卡的 mac 或 ips 有变化,`changes` 数组逐条列出 |
 
-`memory` / `cpus` 条目结构同上(`slot` 为身份),`kind` 含义一致。
+`memory` / `cpus` 条目结构同上(`slot` 为身份),`kind` 含义一致。`disks` / `psus` 条目结构同上(`serial_number` 为身份)。
 
 ### `GET /api/v1/pending-changes/{id}` — diff 详情
 
@@ -250,7 +262,9 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
   "field_choices": {"mgmt.ip": "new"},
   "nic_choices": {"eth1": "new", "eth2": "old"},
   "memory_choices": {"DIMM_A1": "new"},
-  "cpu_choices": {"CPU0": "new"}
+  "cpu_choices": {"CPU0": "new"},
+  "disk_choices": {"123123123": "new"},
+  "psu_choices": {"2P0123123132": "new"}
 }
 ```
 
@@ -260,6 +274,8 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 | `nic_choices` | 网卡条目:网卡名 -> `new` / `old` |
 | `memory_choices` | 内存槽位条目:槽位名 -> `new` / `old` |
 | `cpu_choices` | CPU 槽位条目:槽位名 -> `new` / `old` |
+| `disk_choices` | 硬盘条目:SN -> `new` / `old` |
+| `psu_choices` | 电源条目:SN -> `new` / `old` |
 
 **响应**:
 

@@ -50,5 +50,7 @@ def resolve_pending_change(
         body.nic_choices,
         body.memory_choices,
         body.cpu_choices,
+        body.disk_choices,
+        body.psu_choices,
     )
     return {"applied": result["applied"], "pending_id": pending.id, "status": "applied"}

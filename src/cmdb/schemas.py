@@ -53,11 +53,31 @@ class CpuSlotIn(BaseModel):
     model: str | None = None
 
 
+class DiskIn(BaseModel):
+    """推送体中的单块硬盘,serial_number 为身份,type 为 SSD / HDD。"""
+
+    serial_number: str
+    type: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    size: int | None = None
+    size_unit: str | None = None
+
+
+class PsuIn(BaseModel):
+    """推送体中的单个电源模块,serial_number 为身份。"""
+
+    serial_number: str
+    manufacturer: str | None = None
+    model: str | None = None
+    max_power_w: int | None = None
+
+
 class DevicePush(BaseModel):
     """采集推送体:POST /api/v1/devices 的 body。
 
     timestamp 缺省时由服务器接收时间兜底;full_sync=true 表示全量同步,
-    库中多出的网卡/内存/CPU 进 diff 候删。
+    库中多出的网卡/内存/CPU/硬盘/电源进 diff 候删。
     """
 
     hostname: str
@@ -66,6 +86,8 @@ class DevicePush(BaseModel):
     nics: list[NicIn] = []
     memory: MemoryInfo | None = None
     cpus: list[CpuSlotIn] | None = None
+    disks: list[DiskIn] | None = None
+    psus: list[PsuIn] | None = None
     timestamp: datetime | None = None
     full_sync: bool = False
     source: str | None = None
@@ -85,6 +107,18 @@ class MemorySlotOut(MemorySlotIn):
 
 class CpuSlotOut(CpuSlotIn):
     """响应中的 CPU 槽位(含 id)。"""
+
+    id: int
+
+
+class DiskOut(DiskIn):
+    """响应中的硬盘(含 id)。"""
+
+    id: int
+
+
+class PsuOut(PsuIn):
+    """响应中的电源模块(含 id)。"""
 
     id: int
 
@@ -116,6 +150,8 @@ class DeviceOut(BaseModel):
     nics: list[NicOut] = []
     memory: list[MemorySlotOut] = []
     cpus: list[CpuSlotOut] = []
+    disks: list[DiskOut] = []
+    psus: list[PsuOut] = []
 
 
 class DeviceCreatedOut(BaseModel):
@@ -137,6 +173,8 @@ class ResolutionIn(BaseModel):
     nic_choices: dict[str, str] = {}
     memory_choices: dict[str, str] = {}
     cpu_choices: dict[str, str] = {}
+    disk_choices: dict[str, str] = {}
+    psu_choices: dict[str, str] = {}
 
 
 class TagUpdate(BaseModel):

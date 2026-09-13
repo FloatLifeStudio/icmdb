@@ -100,7 +100,7 @@
             </el-descriptions-item>
           </el-descriptions>
 
-          <el-radio-group v-model="memoryChoices[entry.slot]" class="nic-choice">
+          <el-radio-group v-model="memoryChoices[entry.slot!]" class="nic-choice">
             <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
             <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
           </el-radio-group>
@@ -130,7 +130,81 @@
             </el-descriptions-item>
           </el-descriptions>
 
-          <el-radio-group v-model="cpuChoices[entry.slot]" class="nic-choice">
+          <el-radio-group v-model="cpuChoices[entry.slot!]" class="nic-choice">
+            <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
+            <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
+          </el-radio-group>
+        </el-card>
+
+        <el-card
+          class="card"
+          v-for="entry in pending.diff.disks"
+          :key="entry.serial_number"
+        >
+          <template #header>
+            硬盘 {{ entry.serial_number }}
+            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
+              {{ kindLabel[entry.kind] }}
+            </el-tag>
+          </template>
+
+          <el-descriptions :column="1" border class="nic-detail">
+            <el-descriptions-item v-if="entry.old" label="旧状态">
+              {{ diskRepr(entry.old) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="entry.new" label="新状态">
+              {{ diskRepr(entry.new) }}
+            </el-descriptions-item>
+            <el-descriptions-item
+              v-for="(change, i) in entry.changes"
+              :key="i"
+              :label="change.field"
+            >
+              {{ change.old }} -> {{ change.new }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-radio-group
+            v-model="diskChoices[entry.serial_number!]"
+            class="nic-choice"
+          >
+            <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
+            <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
+          </el-radio-group>
+        </el-card>
+
+        <el-card
+          class="card"
+          v-for="entry in pending.diff.psus"
+          :key="entry.serial_number"
+        >
+          <template #header>
+            电源 {{ entry.serial_number }}
+            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
+              {{ kindLabel[entry.kind] }}
+            </el-tag>
+          </template>
+
+          <el-descriptions :column="1" border class="nic-detail">
+            <el-descriptions-item v-if="entry.old" label="旧状态">
+              {{ psuRepr(entry.old) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="entry.new" label="新状态">
+              {{ psuRepr(entry.new) }}
+            </el-descriptions-item>
+            <el-descriptions-item
+              v-for="(change, i) in entry.changes"
+              :key="i"
+              :label="change.field"
+            >
+              {{ change.old }} -> {{ change.new }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-radio-group
+            v-model="psuChoices[entry.serial_number!]"
+            class="nic-choice"
+          >
             <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
             <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
           </el-radio-group>
@@ -138,7 +212,7 @@
 
         <div
           class="actions"
-          v-if="pending.diff.fields.length || pending.diff.nics.length || pending.diff.memory?.length || pending.diff.cpus?.length"
+          v-if="pending.diff.fields.length || pending.diff.nics.length || pending.diff.memory?.length || pending.diff.cpus?.length || pending.diff.disks?.length || pending.diff.psus?.length"
         >
           <el-button type="primary" :loading="resolving" @click="submit">
             提交裁决
@@ -167,6 +241,8 @@ const fieldChoices = ref<Record<string, string>>({})
 const nicChoices = ref<Record<string, string>>({})
 const memoryChoices = ref<Record<string, string>>({})
 const cpuChoices = ref<Record<string, string>>({})
+const diskChoices = ref<Record<string, string>>({})
+const psuChoices = ref<Record<string, string>>({})
 const listLoading = ref(false)
 const resolving = ref(false)
 const tableRef = ref<TableInstance>()
@@ -239,6 +315,25 @@ function memoryRepr(m: Record<string, unknown>): string {
   return parts.length ? parts.join(' ') : '-'
 }
 
+function diskRepr(d: Record<string, unknown>): string {
+  const parts: string[] = []
+  if (d.type) parts.push(String(d.type))
+  if (d.manufacturer) parts.push(String(d.manufacturer))
+  if (d.model) parts.push(String(d.model))
+  if (d.size) parts.push(`${d.size}${d.size_unit ?? ''}`)
+  if (d.serial_number) parts.push(`SN:${d.serial_number}`)
+  return parts.length ? parts.join(' ') : '-'
+}
+
+function psuRepr(p: Record<string, unknown>): string {
+  const parts: string[] = []
+  if (p.manufacturer) parts.push(String(p.manufacturer))
+  if (p.model) parts.push(String(p.model))
+  if (p.max_power_w) parts.push(`${p.max_power_w}W`)
+  if (p.serial_number) parts.push(`SN:${p.serial_number}`)
+  return parts.length ? parts.join(' ') : '-'
+}
+
 function fmt(ts: string): string {
   // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
   const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z'
@@ -280,11 +375,18 @@ function selectPending(row: PendingChange | null) {
   nicChoices.value = {}
   memoryChoices.value = {}
   cpuChoices.value = {}
+  diskChoices.value = {}
+  psuChoices.value = {}
   if (row) {
     for (const f of row.diff.fields) fieldChoices.value[f.field] = 'new'
     for (const n of row.diff.nics) nicChoices.value[n.name] = 'new'
-    for (const m of row.diff.memory ?? []) memoryChoices.value[m.slot] = 'new'
-    for (const c of row.diff.cpus ?? []) cpuChoices.value[c.slot] = 'new'
+    for (const m of row.diff.memory ?? [])
+      if (m.slot) memoryChoices.value[m.slot] = 'new'
+    for (const c of row.diff.cpus ?? []) if (c.slot) cpuChoices.value[c.slot] = 'new'
+    for (const d of row.diff.disks ?? [])
+      if (d.serial_number) diskChoices.value[d.serial_number] = 'new'
+    for (const p of row.diff.psus ?? [])
+      if (p.serial_number) psuChoices.value[p.serial_number] = 'new'
   }
 }
 
@@ -300,6 +402,8 @@ async function submit() {
       nic_choices: nicChoices.value,
       memory_choices: memoryChoices.value,
       cpu_choices: cpuChoices.value,
+      disk_choices: diskChoices.value,
+      psu_choices: psuChoices.value,
     })
     ElMessage.success(
       res.applied.length

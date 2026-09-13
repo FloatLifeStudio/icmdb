@@ -1,0 +1,59 @@
+{
+  "hostname": "S1A01DC-VL101",
+  "serial_number": "PF4ABC123456",
+  "mgmt": {
+    "mac": "AA:BB:CC:DD:EE:01",
+    "ip": "192.168.10.101",
+    "prefix_length": 24
+  },
+  "nics": [
+    {
+      "name": "eth0",
+      "mac": "AA:BB:CC:DD:EE:02",
+      "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]
+    },
+    {
+      "name": "eth1",
+      "mac": "AA:BB:CC:DD:EE:03",
+      "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
+    }
+  ],
+  "memory": {
+    "slots": [
+      {
+        "slot": "DIMM_A1",
+        "manufacturer": "Samsung",
+        "part_number": "M321R8GA0BB0-CQKZJ",
+        "type": "DDR5",
+        "size_gb": 64,
+        "speed_mts": 4800,
+        "serial_number": "123123456"
+      },
+      {
+        "slot": "DIMM_A2",
+        "manufacturer": "Samsung",
+        "part_number": "M321R8GA0BB0-CQKZJ",
+        "type": "DDR5",
+        "size_gb": 64,
+        "speed_mts": 4800,
+        "serial_number": "123123457"
+      },
+      {
+        "slot": "DIMM_B1",
+        "manufacturer": "Kingston",
+        "part_number": "KSM56R46BD4PMI-32HAI",
+        "type": "DDR5",
+        "size_gb": 32,
+        "speed_mts": 4800,
+        "serial_number": "123123458"
+      }
+    ]
+  },
+  "cpus": [
+    {"slot": "CPU0", "model": "Intel(R) Xeon(R) Gold 6448Y"},
+    {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
+  ],
+  "timestamp": "2026-09-13T10:00:00+08:00",
+  "full_sync": true,
+  "source": "collector"
+}

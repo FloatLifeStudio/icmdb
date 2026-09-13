@@ -398,3 +398,56 @@ def test_push_memory_and_cpu_end_to_end(client):
 
     body = client.get(f"/api/v1/devices/{device_id}").json()
     assert body["cpus"][0]["model"] == "Intel(R) Xeon(R) Gold 6548Y"
+
+
+def test_push_disk_and_psu_end_to_end(client):
+    """带硬盘/电源的推送:created → 详情可见 → 型号 diff → 裁决生效。"""
+    push = make_push(
+        disks=[
+            {"serial_number": "123123123", "type": "SSD",
+             "manufacturer": "Samsung", "model": "990EVO",
+             "size": 8, "size_unit": "TB"},
+            {"serial_number": "123456", "type": "HDD",
+             "manufacturer": "HGST", "model": "HUH728080ALE604",
+             "size": 8, "size_unit": "TB"},
+        ],
+        psus=[
+            {"serial_number": "2P0123123132", "manufacturer": "GreatWall",
+             "model": "CRPS2700D2", "max_power_w": 2700},
+        ],
+    )
+    r = client.post("/api/v1/devices", json=push)
+    assert r.json()["result"] == "created"
+
+    device_id = r.json()["device_id"]
+    body = client.get(f"/api/v1/devices/{device_id}").json()
+    assert body["disks"][0]["model"] == "990EVO"
+    assert body["disks"][0]["size"] == 8
+    assert body["disks"][0]["size_unit"] == "TB"
+    assert [p["serial_number"] for p in body["psus"]] == ["2P0123123132"]
+
+    # 硬盘型号变化 → diff → 裁决采用新值
+    push2 = make_push(
+        disks=[
+            {"serial_number": "123123123", "type": "SSD",
+             "manufacturer": "Samsung", "model": "990PRO",
+             "size": 8, "size_unit": "TB"},
+            {"serial_number": "123456", "type": "HDD",
+             "manufacturer": "HGST", "model": "HUH728080ALE604",
+             "size": 8, "size_unit": "TB"},
+        ],
+        psus=push["psus"],
+    )
+    r = client.post("/api/v1/devices", json=push2)
+    pending_id = r.json()["pending_change_id"]
+    assert r.json()["result"] == "diff_created"
+
+    r = client.post(
+        f"/api/v1/pending-changes/{pending_id}/resolve",
+        json={"field_choices": {}, "nic_choices": {}, "disk_choices": {"123123123": "new"}},
+    )
+    assert r.status_code == 200
+    assert "硬盘 123123123 model: 990EVO -> 990PRO" in r.json()["applied"]
+
+    body = client.get(f"/api/v1/devices/{device_id}").json()
+    assert body["disks"][0]["model"] == "990PRO"

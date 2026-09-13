@@ -83,6 +83,34 @@ class Cpu(SQLModel, table=True):
     model: str | None = None
 
 
+class Disk(SQLModel, table=True):
+    """硬盘表,serial_number 为身份(device 内唯一),type 为 SSD / HDD。"""
+
+    __table_args__ = (UniqueConstraint("device_id", "serial_number"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    device_id: int = Field(foreign_key="device.id", index=True)
+    serial_number: str
+    type: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    size: int | None = None
+    size_unit: str | None = None
+
+
+class Psu(SQLModel, table=True):
+    """电源模块表,serial_number 为身份(device 内唯一)。"""
+
+    __table_args__ = (UniqueConstraint("device_id", "serial_number"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    device_id: int = Field(foreign_key="device.id", index=True)
+    serial_number: str
+    manufacturer: str | None = None
+    model: str | None = None
+    max_power_w: int | None = None
+
+
 class PendingChange(SQLModel, table=True):
     """冲突待裁决,同一设备仅一条 pending,新推送合并进同一条。"""
 

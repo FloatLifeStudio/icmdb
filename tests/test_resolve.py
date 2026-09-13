@@ -3,7 +3,17 @@
 from datetime import datetime
 from sqlmodel import Session, select
 
-from cmdb.models import ChangeHistory, Cpu, Device, MemorySlot, Nic, NicIP, PendingChange
+from cmdb.models import (
+    ChangeHistory,
+    Cpu,
+    Device,
+    Disk,
+    MemorySlot,
+    Nic,
+    NicIP,
+    PendingChange,
+    Psu,
+)
 from cmdb.schemas import DevicePush
 from cmdb.services.ingest import ingest_push
 from cmdb.services.resolve import apply_resolution
@@ -304,3 +314,100 @@ def test_apply_cpu_added_and_changed(engine):
             select(Cpu).where(Cpu.slot == "CPU0")
         ).one()
         assert cpu0.model == "Xeon-6548Y"
+
+
+def disks(*specs) -> list[dict]:
+    return [
+        {"serial_number": sn, "type": t, "manufacturer": m, "model": mdl,
+         "size": s, "size_unit": u}
+        for sn, t, m, mdl, s, u in specs
+    ]
+
+
+def test_apply_disk_added_removed_and_changed(engine):
+    with Session(engine) as session:
+        # 新增
+        ingest_push(
+            session,
+            make_push(disks=disks(
+                ("SN1", "SSD", "Samsung", "990EVO", 8, "TB"))),
+            RECEIVED_AT,
+        )
+        result = ingest_push(
+            session,
+            make_push(disks=disks(
+                ("SN1", "SSD", "Samsung", "990EVO", 8, "TB"),
+                ("SN2", "HDD", "HGST", "HUH728080ALE604", 8, "TB"))),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        result = apply_resolution(session, pending, {}, {}, {}, {}, {"SN2": "new"})
+        assert result["applied"] == ["硬盘 SN2 新增"]
+        assert [d.serial_number for d in session.exec(select(Disk)).all()] == ["SN1", "SN2"]
+
+        # 型号变化
+        result = ingest_push(
+            session,
+            make_push(disks=disks(
+                ("SN1", "SSD", "Samsung", "990PRO", 8, "TB"),
+                ("SN2", "HDD", "HGST", "HUH728080ALE604", 8, "TB"))),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        result = apply_resolution(session, pending, {}, {}, {}, {}, {"SN1": "new"})
+        assert result["applied"] == ["硬盘 SN1 model: 990EVO -> 990PRO"]
+
+        # full_sync 少一块 → 候删
+        result = ingest_push(
+            session,
+            make_push(disks=disks(("SN1", "SSD", "Samsung", "990PRO", 8, "TB"))),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        result = apply_resolution(session, pending, {}, {}, {}, {}, {"SN2": "new"})
+        assert result["applied"] == ["硬盘 SN2 删除"]
+        assert [d.serial_number for d in session.exec(select(Disk)).all()] == ["SN1"]
+
+
+def test_apply_psu_added_and_changed(engine):
+    with Session(engine) as session:
+        ingest_push(
+            session,
+            make_push(psus=[{"serial_number": "PSN1", "manufacturer": "GreatWall",
+                             "model": "CRPS2700D2", "max_power_w": 2700}]),
+            RECEIVED_AT,
+        )
+        result = ingest_push(
+            session,
+            make_push(psus=[
+                {"serial_number": "PSN1", "manufacturer": "GreatWall",
+                 "model": "CRPS2700D2", "max_power_w": 2700},
+                {"serial_number": "PSN2", "manufacturer": "GreatWall",
+                 "model": "CRPS2700D2", "max_power_w": 2700},
+            ]),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        result = apply_resolution(session, pending, {}, {}, {}, {}, {}, {"PSN2": "new"})
+        assert result["applied"] == ["电源 PSN2 新增"]
+        assert len(session.exec(select(Psu)).all()) == 2
+
+        # 功率变化
+        result = ingest_push(
+            session,
+            make_push(psus=[
+                {"serial_number": "PSN1", "manufacturer": "GreatWall",
+                 "model": "CRPS2700D2", "max_power_w": 2400},
+                {"serial_number": "PSN2", "manufacturer": "GreatWall",
+                 "model": "CRPS2700D2", "max_power_w": 2700},
+            ]),
+            RECEIVED_AT,
+        )
+        assert result["result"] == "diff_created"
+        pending = session.get(PendingChange, result["pending_change_id"])
+        result = apply_resolution(session, pending, {}, {}, {}, {}, {}, {"PSN1": "new"})
+        assert result["applied"] == ["电源 PSN1 max_power_w: 2700 -> 2400"]

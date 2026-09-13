@@ -19,7 +19,7 @@ diff 结构约定(pending_changes.diff 存的就是它):
 - kind=removed 仅在 full_sync=true 时产生(库中多出的网卡候删)
 """
 
-from cmdb.schemas import CpuSlotIn, DevicePush, MemorySlotIn, NicIn
+from cmdb.schemas import CpuSlotIn, DevicePush, DiskIn, MemorySlotIn, NicIn, PsuIn
 
 # 主机字段:推送体字段路径 -> 快照键
 _HOST_FIELDS = {
@@ -249,6 +249,132 @@ def _cpu_diff(
     return entries
 
 
+def _disk_diff(
+    snapshot_disks: dict[str, dict],
+    pushed_disks: list[DiskIn],
+    full_sync: bool,
+) -> list[dict]:
+    """硬盘级 diff。身份 serial_number。snapshot_disks: {sn: {字段: 值}}。"""
+    entries: list[dict] = []
+    pushed_sns = set()
+
+    for disk in pushed_disks:
+        pushed_sns.add(disk.serial_number)
+        old = snapshot_disks.get(disk.serial_number)
+        if old is None:
+            entries.append(
+                {
+                    "serial_number": disk.serial_number,
+                    "kind": "added",
+                    "changes": [],
+                    "old": None,
+                    "new": {
+                        "serial_number": disk.serial_number,
+                        "type": disk.type,
+                        "manufacturer": disk.manufacturer,
+                        "model": disk.model,
+                        "size": disk.size,
+                        "size_unit": disk.size_unit,
+                    },
+                }
+            )
+            continue
+
+        changes = []
+        pushed_fields = {
+            "type": disk.type,
+            "manufacturer": disk.manufacturer,
+            "model": disk.model,
+            "size": disk.size,
+            "size_unit": disk.size_unit,
+        }
+        for field, new in pushed_fields.items():
+            if new is None:
+                continue
+            if new != old.get(field):
+                changes.append({"field": field, "old": old.get(field), "new": new})
+        if changes:
+            entries.append(
+                {"serial_number": disk.serial_number, "kind": "changed", "changes": changes}
+            )
+
+    if full_sync:
+        for sn, old in sorted(snapshot_disks.items()):
+            if sn not in pushed_sns:
+                entries.append(
+                    {
+                        "serial_number": sn,
+                        "kind": "removed",
+                        "changes": [],
+                        "old": old,
+                        "new": None,
+                    }
+                )
+
+    return entries
+
+
+def _psu_diff(
+    snapshot_psus: dict[str, dict],
+    pushed_psus: list[PsuIn],
+    full_sync: bool,
+) -> list[dict]:
+    """电源模块级 diff。身份 serial_number。snapshot_psus: {sn: {字段: 值}}。"""
+    entries: list[dict] = []
+    pushed_sns = set()
+
+    for psu in pushed_psus:
+        pushed_sns.add(psu.serial_number)
+        old = snapshot_psus.get(psu.serial_number)
+        if old is None:
+            entries.append(
+                {
+                    "serial_number": psu.serial_number,
+                    "kind": "added",
+                    "changes": [],
+                    "old": None,
+                    "new": {
+                        "serial_number": psu.serial_number,
+                        "manufacturer": psu.manufacturer,
+                        "model": psu.model,
+                        "max_power_w": psu.max_power_w,
+                    },
+                }
+            )
+            continue
+
+        changes = []
+        pushed_fields = {
+            "manufacturer": psu.manufacturer,
+            "model": psu.model,
+            "max_power_w": psu.max_power_w,
+        }
+        for field, new in pushed_fields.items():
+            if new is None:
+                continue
+            if new != old.get(field):
+                changes.append({"field": field, "old": old.get(field), "new": new})
+        if changes:
+            entries.append(
+                {"serial_number": psu.serial_number, "kind": "changed", "changes": changes}
+            )
+
+    if full_sync:
+        for sn, old in sorted(snapshot_psus.items()):
+            if sn not in pushed_sns:
+                entries.append(
+                    {
+                        "serial_number": sn,
+                        "kind": "removed",
+                        "changes": [],
+                        "old": old,
+                        "new": None,
+                    }
+                )
+
+    return entries
+
+
 def diff_push(snapshot: dict, push: DevicePush) -> dict:
     """比较推送体与库中设备当前快照,返回完整 diff 清单。
 
@@ -267,9 +393,16 @@ def diff_push(snapshot: dict, push: DevicePush) -> dict:
         "cpus": _cpu_diff(
             snapshot.get("cpus", {}), (push.cpus if push.cpus else []), push.full_sync
         ),
+        "disks": _disk_diff(
+            snapshot.get("disks", {}), (push.disks if push.disks else []), push.full_sync
+        ),
+        "psus": _psu_diff(
+            snapshot.get("psus", {}), (push.psus if push.psus else []), push.full_sync
+        ),
     }
     diff["has_changes"] = bool(
         diff["fields"] or diff["nics"] or diff["memory"] or diff["cpus"]
+        or diff["disks"] or diff["psus"]
     )
     return diff
 
@@ -300,11 +433,22 @@ def merge_diff(existing: dict, new: dict) -> dict:
         "slot", existing.get("memory", []) + new.get("memory", [])
     )
     merged_cpus = _merge_by("slot", existing.get("cpus", []) + new.get("cpus", []))
+    merged_disks = _merge_by(
+        "serial_number", existing.get("disks", []) + new.get("disks", [])
+    )
+    merged_psus = _merge_by(
+        "serial_number", existing.get("psus", []) + new.get("psus", [])
+    )
 
     return {
         "fields": merged_fields,
         "nics": merged_nics,
         "memory": merged_memory,
         "cpus": merged_cpus,
-        "has_changes": bool(merged_fields or merged_nics or merged_memory or merged_cpus),
+        "disks": merged_disks,
+        "psus": merged_psus,
+        "has_changes": bool(
+            merged_fields or merged_nics or merged_memory or merged_cpus
+            or merged_disks or merged_psus
+        ),
     }

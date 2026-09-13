@@ -17,10 +17,12 @@ from cmdb.models import (
     ChangeHistory,
     Cpu,
     Device,
+    Disk,
     MemorySlot,
     Nic,
     NicIP,
     PendingChange,
+    Psu,
     utcnow,
 )
 
@@ -113,6 +115,88 @@ def _apply_cpu(session: Session, device: Device, entry: dict) -> None:
             existing.model = change["new"]
 
 
+_DISK_FIELDS = ("type", "manufacturer", "model", "size", "size_unit")
+_PSU_FIELDS = ("manufacturer", "model", "max_power_w")
+
+
+def _apply_disk(session: Session, device: Device, entry: dict) -> None:
+    """按裁决结果处理单块硬盘条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    sn = entry["serial_number"]
+    existing = session.exec(
+        select(Disk).where(
+            Disk.device_id == device.id, Disk.serial_number == sn
+        )
+    ).first()
+
+    if entry["kind"] == "added":
+        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+            return
+        new = entry["new"]
+        session.add(
+            Disk(
+                device_id=device.id,
+                serial_number=sn,
+                type=new.get("type"),
+                manufacturer=new.get("manufacturer"),
+                model=new.get("model"),
+                size=new.get("size"),
+                size_unit=new.get("size_unit"),
+            )
+        )
+        return
+
+    if entry["kind"] == "removed":
+        if existing is None:
+            return
+        session.delete(existing)
+        return
+
+    # kind == changed
+    if existing is None:
+        return
+    for change in entry.get("changes", []):
+        if change["field"] in _DISK_FIELDS:
+            setattr(existing, change["field"], change["new"])
+
+
+def _apply_psu(session: Session, device: Device, entry: dict) -> None:
+    """按裁决结果处理单个电源模块条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    sn = entry["serial_number"]
+    existing = session.exec(
+        select(Psu).where(
+            Psu.device_id == device.id, Psu.serial_number == sn
+        )
+    ).first()
+
+    if entry["kind"] == "added":
+        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+            return
+        new = entry["new"]
+        session.add(
+            Psu(
+                device_id=device.id,
+                serial_number=sn,
+                manufacturer=new.get("manufacturer"),
+                model=new.get("model"),
+                max_power_w=new.get("max_power_w"),
+            )
+        )
+        return
+
+    if entry["kind"] == "removed":
+        if existing is None:
+            return
+        session.delete(existing)
+        return
+
+    # kind == changed
+    if existing is None:
+        return
+    for change in entry.get("changes", []):
+        if change["field"] in _PSU_FIELDS:
+            setattr(existing, change["field"], change["new"])
+
+
 def _apply_nic(session: Session, device: Device, entry: dict) -> None:
     """按裁决结果处理单个网卡条目(kind=added/removed/changed,选择已过滤为 new)。"""
     kind = entry["kind"]
@@ -166,6 +250,8 @@ def apply_resolution(
     nic_choices: dict[str, str],
     memory_choices: dict[str, str] | None = None,
     cpu_choices: dict[str, str] | None = None,
+    disk_choices: dict[str, str] | None = None,
+    psu_choices: dict[str, str] | None = None,
 ) -> dict:
     """应用裁决:选择 new 的条目生效,选择 old 的保留现状。
 
@@ -240,6 +326,38 @@ def apply_resolution(
                     f"{change['old']} -> {change['new']}"
                 )
         _apply_cpu(session, device, entry)
+
+    for entry in pending.diff.get("disks", []):
+        choice = (disk_choices or {}).get(entry["serial_number"])
+        if choice != "new":
+            continue
+        if entry["kind"] == "added":
+            summaries.append(f"硬盘 {entry['serial_number']} 新增")
+        elif entry["kind"] == "removed":
+            summaries.append(f"硬盘 {entry['serial_number']} 删除")
+        else:
+            for change in entry.get("changes", []):
+                summaries.append(
+                    f"硬盘 {entry['serial_number']} {change['field']}: "
+                    f"{change['old']} -> {change['new']}"
+                )
+        _apply_disk(session, device, entry)
+
+    for entry in pending.diff.get("psus", []):
+        choice = (psu_choices or {}).get(entry["serial_number"])
+        if choice != "new":
+            continue
+        if entry["kind"] == "added":
+            summaries.append(f"电源 {entry['serial_number']} 新增")
+        elif entry["kind"] == "removed":
+            summaries.append(f"电源 {entry['serial_number']} 删除")
+        else:
+            for change in entry.get("changes", []):
+                summaries.append(
+                    f"电源 {entry['serial_number']} {change['field']}: "
+                    f"{change['old']} -> {change['new']}"
+                )
+        _apply_psu(session, device, entry)
 
     pending.status = "applied"
     pending.resolved_at = utcnow()

@@ -108,6 +108,45 @@
       </el-table>
     </el-card>
 
+    <el-card v-if="device && device.disks.length" class="card">
+      <template #header>硬盘</template>
+      <el-table :data="device.disks" border>
+        <el-table-column prop="type" label="类型" width="90">
+          <template #default="{ row }">{{ row.type || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="manufacturer" label="品牌" min-width="110">
+          <template #default="{ row }">{{ row.manufacturer || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="model" label="型号" min-width="190">
+          <template #default="{ row }">{{ row.model || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="容量" width="110">
+          <template #default="{ row }">
+            {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="serial_number" label="SN" min-width="130" />
+      </el-table>
+    </el-card>
+
+    <el-card v-if="device && device.psus.length" class="card">
+      <template #header>电源</template>
+      <el-table :data="device.psus" border>
+        <el-table-column prop="manufacturer" label="品牌" min-width="110">
+          <template #default="{ row }">{{ row.manufacturer || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="model" label="型号" min-width="190">
+          <template #default="{ row }">{{ row.model || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="最大功率" width="130">
+          <template #default="{ row }">
+            {{ row.max_power_w ? row.max_power_w + 'W' : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="serial_number" label="SN" min-width="130" />
+      </el-table>
+    </el-card>
+
     <el-card class="card history-card">
       <template #header>变更历史(裁决生效的改动)</template>
       <el-table

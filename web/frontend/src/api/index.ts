@@ -31,6 +31,24 @@ export interface CpuSlot {
   model: string | null
 }
 
+export interface Disk {
+  id: number
+  serial_number: string
+  type: string | null
+  manufacturer: string | null
+  model: string | null
+  size: number | null
+  size_unit: string | null
+}
+
+export interface Psu {
+  id: number
+  serial_number: string
+  manufacturer: string | null
+  model: string | null
+  max_power_w: number | null
+}
+
 export interface DeviceOut {
   id: number
   hostname: string
@@ -46,6 +64,8 @@ export interface DeviceOut {
   nics: NicOut[]
   memory: MemorySlot[]
   cpus: CpuSlot[]
+  disks: Disk[]
+  psus: Psu[]
 }
 
 export interface DeviceListOut {
@@ -70,7 +90,8 @@ export interface NicDiff {
 }
 
 export interface SlotDiff {
-  slot: string
+  slot?: string
+  serial_number?: string
   kind: 'added' | 'removed' | 'changed'
   changes: { field: string; old: unknown; new: unknown }[]
   old: Record<string, unknown> | null
@@ -87,6 +108,8 @@ export interface PendingChange {
     nics: NicDiff[]
     memory?: SlotDiff[]
     cpus?: SlotDiff[]
+    disks?: SlotDiff[]
+    psus?: SlotDiff[]
     has_changes: boolean
   }
   status: string
@@ -105,6 +128,8 @@ export interface ResolveBody {
   nic_choices: Record<string, string>
   memory_choices?: Record<string, string>
   cpu_choices?: Record<string, string>
+  disk_choices?: Record<string, string>
+  psu_choices?: Record<string, string>
 }
 
 export interface DashboardOut {
