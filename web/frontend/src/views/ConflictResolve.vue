@@ -46,168 +46,145 @@
           </el-table>
         </el-card>
 
-        <el-card class="card" v-for="entry in pending.diff.nics" :key="entry.name">
-          <template #header>
-            网卡 {{ entry.name }}
-            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
-              {{ kindLabel[entry.kind] }}
-            </el-tag>
-          </template>
-
-          <el-descriptions :column="1" border class="nic-detail">
-            <el-descriptions-item v-if="entry.old" label="旧状态">
-              {{ nicRepr(entry.old) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="entry.new" label="新状态">
-              {{ nicRepr(entry.new) }}
-            </el-descriptions-item>
-            <el-descriptions-item
-              v-for="(change, i) in entry.changes"
-              :key="i"
-              :label="fieldLabel(change.field)"
-            >
-              {{ fmtChange(change) }}
-            </el-descriptions-item>
-          </el-descriptions>
-
-          <el-radio-group v-model="nicChoices[entry.name]" class="nic-choice">
-            <el-radio value="old">{{ kindOldLabel[entry.kind] }}</el-radio>
-            <el-radio value="new">{{ kindNewLabel[entry.kind] }}</el-radio>
-          </el-radio-group>
+        <el-card class="card" v-if="pending.diff.nics.length">
+          <template #header>网卡</template>
+          <el-table :data="pending.diff.nics" border>
+            <el-table-column label="网卡" width="110">
+              <template #default="{ row }">{{ row.name }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="kindTag[row.kind]" size="small">
+                  {{ kindLabel[row.kind] }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="变更内容" min-width="280">
+              <template #default="{ row }">{{ nicContent(row) }}</template>
+            </el-table-column>
+            <el-table-column label="裁决" width="220">
+              <template #default="{ row }">
+                <el-radio-group v-model="nicChoices[row.name]" v-if="row.name">
+                  <el-radio value="old">{{ kindOldLabel[row.kind] }}</el-radio>
+                  <el-radio value="new">{{ kindNewLabel[row.kind] }}</el-radio>
+                </el-radio-group>
+              </template>
+            </el-table-column>
+          </el-table>
         </el-card>
 
-        <el-card class="card" v-for="entry in pending.diff.memory" :key="entry.slot">
-          <template #header>
-            内存 {{ entry.slot }}
-            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
-              {{ kindLabel[entry.kind] }}
-            </el-tag>
-          </template>
-
-          <el-descriptions :column="1" border class="nic-detail">
-            <el-descriptions-item v-if="entry.old" label="旧状态">
-              {{ memoryRepr(entry.old) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="entry.new" label="新状态">
-              {{ memoryRepr(entry.new) }}
-            </el-descriptions-item>
-            <el-descriptions-item
-              v-for="(change, i) in entry.changes"
-              :key="i"
-              :label="change.field"
-            >
-              {{ change.old }} -> {{ change.new }}
-            </el-descriptions-item>
-          </el-descriptions>
-
-          <el-radio-group v-model="memoryChoices[entry.slot!]" class="nic-choice">
-            <el-radio value="old">{{ memoryOldLabel[entry.kind] }}</el-radio>
-            <el-radio value="new">{{ memoryNewLabel[entry.kind] }}</el-radio>
-          </el-radio-group>
+        <el-card class="card" v-if="pending.diff.memory?.length">
+          <template #header>内存</template>
+          <el-table :data="pending.diff.memory" border>
+            <el-table-column label="槽位" width="120">
+              <template #default="{ row }">{{ row.slot }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="kindTag[row.kind]" size="small">
+                  {{ kindLabel[row.kind] }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="变更内容" min-width="280">
+              <template #default="{ row }">{{ partContent(memoryRepr, row) }}</template>
+            </el-table-column>
+            <el-table-column label="裁决" width="220">
+              <template #default="{ row }">
+                <el-radio-group v-model="memoryChoices[row.slot!]" v-if="row.slot">
+                  <el-radio value="old">{{ memoryOldLabel[row.kind] }}</el-radio>
+                  <el-radio value="new">{{ memoryNewLabel[row.kind] }}</el-radio>
+                </el-radio-group>
+              </template>
+            </el-table-column>
+          </el-table>
         </el-card>
 
-        <el-card class="card" v-for="entry in pending.diff.cpus" :key="entry.slot">
-          <template #header>
-            CPU {{ entry.slot }}
-            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
-              {{ kindLabel[entry.kind] }}
-            </el-tag>
-          </template>
-
-          <el-descriptions :column="1" border class="nic-detail">
-            <el-descriptions-item v-if="entry.old" label="旧状态">
-              {{ entry.old?.model ?? '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="entry.new" label="新状态">
-              {{ entry.new?.model ?? '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item
-              v-for="(change, i) in entry.changes"
-              :key="i"
-              :label="change.field"
-            >
-              {{ change.old }} -> {{ change.new }}
-            </el-descriptions-item>
-          </el-descriptions>
-
-          <el-radio-group v-model="cpuChoices[entry.slot!]" class="nic-choice">
-            <el-radio value="old">{{ cpuOldLabel[entry.kind] }}</el-radio>
-            <el-radio value="new">{{ cpuNewLabel[entry.kind] }}</el-radio>
-          </el-radio-group>
+        <el-card class="card" v-if="pending.diff.cpus?.length">
+          <template #header>CPU</template>
+          <el-table :data="pending.diff.cpus" border>
+            <el-table-column label="槽位" width="120">
+              <template #default="{ row }">{{ row.slot }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="kindTag[row.kind]" size="small">
+                  {{ kindLabel[row.kind] }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="变更内容" min-width="280">
+              <template #default="{ row }">{{ partContent(cpuRepr, row) }}</template>
+            </el-table-column>
+            <el-table-column label="裁决" width="220">
+              <template #default="{ row }">
+                <el-radio-group v-model="cpuChoices[row.slot!]" v-if="row.slot">
+                  <el-radio value="old">{{ cpuOldLabel[row.kind] }}</el-radio>
+                  <el-radio value="new">{{ cpuNewLabel[row.kind] }}</el-radio>
+                </el-radio-group>
+              </template>
+            </el-table-column>
+          </el-table>
         </el-card>
 
-        <el-card
-          class="card"
-          v-for="entry in pending.diff.disks"
-          :key="entry.serial_number"
-        >
-          <template #header>
-            硬盘 {{ entry.serial_number }}
-            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
-              {{ kindLabel[entry.kind] }}
-            </el-tag>
-          </template>
-
-          <el-descriptions :column="1" border class="nic-detail">
-            <el-descriptions-item v-if="entry.old" label="旧状态">
-              {{ diskRepr(entry.old) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="entry.new" label="新状态">
-              {{ diskRepr(entry.new) }}
-            </el-descriptions-item>
-            <el-descriptions-item
-              v-for="(change, i) in entry.changes"
-              :key="i"
-              :label="change.field"
-            >
-              {{ change.old }} -> {{ change.new }}
-            </el-descriptions-item>
-          </el-descriptions>
-
-          <el-radio-group
-            v-model="diskChoices[entry.serial_number!]"
-            class="nic-choice"
-          >
-            <el-radio value="old">{{ diskOldLabel[entry.kind] }}</el-radio>
-            <el-radio value="new">{{ diskNewLabel[entry.kind] }}</el-radio>
-          </el-radio-group>
+        <el-card class="card" v-if="pending.diff.disks?.length">
+          <template #header>硬盘</template>
+          <el-table :data="pending.diff.disks" border>
+            <el-table-column label="SN" width="130">
+              <template #default="{ row }">{{ row.serial_number }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="kindTag[row.kind]" size="small">
+                  {{ kindLabel[row.kind] }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="变更内容" min-width="280">
+              <template #default="{ row }">{{ partContent(diskRepr, row) }}</template>
+            </el-table-column>
+            <el-table-column label="裁决" width="220">
+              <template #default="{ row }">
+                <el-radio-group
+                  v-model="diskChoices[row.serial_number!]"
+                  v-if="row.serial_number"
+                >
+                  <el-radio value="old">{{ diskOldLabel[row.kind] }}</el-radio>
+                  <el-radio value="new">{{ diskNewLabel[row.kind] }}</el-radio>
+                </el-radio-group>
+              </template>
+            </el-table-column>
+          </el-table>
         </el-card>
 
-        <el-card
-          class="card"
-          v-for="entry in pending.diff.psus"
-          :key="entry.serial_number"
-        >
-          <template #header>
-            电源 {{ entry.serial_number }}
-            <el-tag :type="kindTag[entry.kind]" class="kind-tag">
-              {{ kindLabel[entry.kind] }}
-            </el-tag>
-          </template>
-
-          <el-descriptions :column="1" border class="nic-detail">
-            <el-descriptions-item v-if="entry.old" label="旧状态">
-              {{ psuRepr(entry.old) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="entry.new" label="新状态">
-              {{ psuRepr(entry.new) }}
-            </el-descriptions-item>
-            <el-descriptions-item
-              v-for="(change, i) in entry.changes"
-              :key="i"
-              :label="change.field"
-            >
-              {{ change.old }} -> {{ change.new }}
-            </el-descriptions-item>
-          </el-descriptions>
-
-          <el-radio-group
-            v-model="psuChoices[entry.serial_number!]"
-            class="nic-choice"
-          >
-            <el-radio value="old">{{ psuOldLabel[entry.kind] }}</el-radio>
-            <el-radio value="new">{{ psuNewLabel[entry.kind] }}</el-radio>
-          </el-radio-group>
+        <el-card class="card" v-if="pending.diff.psus?.length">
+          <template #header>电源</template>
+          <el-table :data="pending.diff.psus" border>
+            <el-table-column label="SN" width="130">
+              <template #default="{ row }">{{ row.serial_number }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="kindTag[row.kind]" size="small">
+                  {{ kindLabel[row.kind] }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="变更内容" min-width="280">
+              <template #default="{ row }">{{ partContent(psuRepr, row) }}</template>
+            </el-table-column>
+            <el-table-column label="裁决" width="220">
+              <template #default="{ row }">
+                <el-radio-group
+                  v-model="psuChoices[row.serial_number!]"
+                  v-if="row.serial_number"
+                >
+                  <el-radio value="old">{{ psuOldLabel[row.kind] }}</el-radio>
+                  <el-radio value="new">{{ psuNewLabel[row.kind] }}</el-radio>
+                </el-radio-group>
+              </template>
+            </el-table-column>
+          </el-table>
         </el-card>
 
         <div
@@ -368,6 +345,35 @@ function psuRepr(p: Record<string, unknown>): string {
   return parts.length ? parts.join(' ') : '-'
 }
 
+function cpuRepr(c: Record<string, unknown>): string {
+  return String(c.model ?? '-')
+}
+
+// 行内变更摘要:added/removed 显示完整状态,changed 逐字段列出
+function nicContent(entry: NicDiff): string {
+  if (entry.kind === 'added') return `新增 ${nicRepr(entry.new ?? {})}`
+  if (entry.kind === 'removed') return `删除 ${nicRepr(entry.old ?? {})}`
+  return entry.changes.map((c) => `${fieldLabel(c.field)}: ${fmtChange(c)}`).join('; ')
+}
+
+function partContent(
+  reprFn: (o: Record<string, unknown>) => string,
+  entry: {
+    kind: string
+    old: unknown
+    new: unknown
+    changes: { field: string; old: unknown; new: unknown }[]
+  },
+): string {
+  if (entry.kind === 'added') {
+    return `新增 ${reprFn((entry.new as Record<string, unknown>) ?? {})}`
+  }
+  if (entry.kind === 'removed') {
+    return `删除 ${reprFn((entry.old as Record<string, unknown>) ?? {})}`
+  }
+  return entry.changes.map((c) => `${c.field}: ${c.old} -> ${c.new}`).join('; ')
+}
+
 function fmt(ts: string): string {
   // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
   const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z'
@@ -494,12 +500,6 @@ async function submit() {
 }
 .kind-tag {
   margin-left: 8px;
-}
-.nic-detail {
-  margin-bottom: 12px;
-}
-.nic-choice {
-  margin-bottom: 4px;
 }
 .actions {
   margin-top: 4px;
