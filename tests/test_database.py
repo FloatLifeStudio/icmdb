@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
-from cmdb.database import make_engine, migrate
+from cmdb.database import init_db, make_engine, migrate
 from cmdb.models import Device, Nic, NicIP
 
 
@@ -60,7 +60,7 @@ def test_wal_mode(engine):
 
 
 def test_migrate_adds_missing_columns(tmp_path):
-    """旧库(无 tags/diff 列)迁移后补上新列,已有数据不受影响。"""
+    """旧库(无 diff 列)迁移后补上新列;旧 tags 列迁到 devicetag 表后删列。"""
     eng = make_engine(str(tmp_path / "old.db"))
     with eng.connect() as conn:
         conn.exec_driver_sql(
@@ -71,17 +71,24 @@ def test_migrate_adds_missing_columns(tmp_path):
             "CREATE TABLE changehistory (id INTEGER PRIMARY KEY, device_id INTEGER, "
             "summary VARCHAR)"
         )
-        conn.exec_driver_sql("INSERT INTO device (hostname) VALUES ('old-host')")
+        conn.exec_driver_sql(
+            "INSERT INTO device (hostname, tags) VALUES ('old-host', '生产,web')"
+        )
         conn.commit()
 
+    init_db(eng)  # 生产流程先 create_all(补建 devicetag 等新表)再迁移
     migrate(eng)
     with eng.connect() as conn:
         cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(device)")}
-        assert "tags" in cols
+        assert "tags" not in cols  # 旧列已删除
         row = conn.exec_driver_sql(
-            "SELECT hostname, tags FROM device WHERE hostname = 'old-host'"
+            "SELECT hostname FROM device WHERE hostname = 'old-host'"
         ).fetchone()
         assert row[0] == "old-host"  # 已有数据保留
+        tags = conn.exec_driver_sql(
+            "SELECT name FROM devicetag WHERE device_id = 1 ORDER BY id"
+        ).fetchall()
+        assert [t[0] for t in tags] == ["生产", "web"]  # 旧标签迁入新表
         hcols = {
             row[1] for row in conn.exec_driver_sql("PRAGMA table_info(changehistory)")
         }

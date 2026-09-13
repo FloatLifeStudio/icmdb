@@ -20,7 +20,7 @@
       </el-select>
       <el-input
         v-model="tagFilter"
-        placeholder="按标签筛选(如:生产)"
+        placeholder="按标签筛选(精确匹配)"
         clearable
         class="filter"
         @input="load"

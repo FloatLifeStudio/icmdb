@@ -33,13 +33,12 @@ _engine = None
 # 轻量迁移:已有表补新列(SQLite ALTER TABLE);新库由 create_all 直接建出
 # 注意表名是 SQLModel 默认的类名小写:device / changehistory
 _MIGRATIONS = {
-    "device": {"tags": "TEXT NOT NULL DEFAULT ''"},
     "changehistory": {"diff": "JSON"},
 }
 
 
 def migrate(engine) -> None:
-    """检查既有表的列,补缺失的列(幂等)。"""
+    """检查既有表的列,补缺失的列 + 旧数据迁移(幂等)。"""
     with engine.connect() as conn:
         for table, cols in _MIGRATIONS.items():
             existing = {
@@ -50,7 +49,29 @@ def migrate(engine) -> None:
             for col, ddl in cols.items():
                 if col not in existing:
                     conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+        _migrate_tags_column(conn)
         conn.commit()
+
+
+def _migrate_tags_column(conn) -> None:
+    """旧 device.tags 逗号分隔 TEXT 列 -> device_tag 表;迁完删列。
+
+    仅在列还存在时执行(device_tag 由 create_all 先建好)。
+    """
+    cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(device)")}
+    if "tags" not in cols:
+        return
+    rows = conn.exec_driver_sql(
+        "SELECT id, tags FROM device WHERE tags != ''"
+    ).fetchall()
+    for device_id, tags in rows:
+        for name in (t.strip() for t in tags.split(",")):
+            if name:
+                conn.exec_driver_sql(
+                    "INSERT OR IGNORE INTO devicetag (device_id, name) VALUES (?, ?)",
+                    (device_id, name),
+                )
+    conn.exec_driver_sql("ALTER TABLE device DROP COLUMN tags")
 
 
 def get_engine_cached():

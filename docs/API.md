@@ -136,7 +136,7 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices \
 | `page_size` | 20 | 每页数量 |
 | `search` | - | 模糊搜索,覆盖 hostname / serial_number / mgmt_ip / 网卡业务 IP(反查) |
 | `status` | - | `active` / `suspected_offline`,按推送阈值在 SQL 层筛选 |
-| `tag` | - | 按标签筛选 |
+| `tag` | - | 按标签精确匹配 |
 | `sort_by` | - | 排序字段,白名单:`hostname` / `serial_number` / `mgmt_ip` / `last_pushed_at` |
 | `sort_order` | `asc` | `asc` / `desc` |
 
@@ -364,7 +364,8 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 ```
 
 **行为**:逐行走与推送相同的清洗逻辑(hostname 匹配、diff 进待裁决),
-`source` 标记为 `csv_import`;标签随导入设置。
+`source` 标记为 `csv_import`;标签随导入设置;不触碰 `last_pushed_at`
+(回导不会倒退最后推送时间)。
 
 ```json
 {"created": 1, "unchanged": 0, "diff_created": 0, "errors": []}
@@ -389,7 +390,7 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 行为同单个删除(硬删,历史保留);返回 `{"deleted": [实际删除的 id]}`。
 
 **列表搜索增强**:`search` 同时覆盖 hostname / serial_number / mgmt_ip /
-网卡业务 IP(按 IP 反查设备);`tag` 参数按标签筛选。
+网卡业务 IP(按 IP 反查设备);`tag` 参数按标签精确匹配。
 
 ---
 

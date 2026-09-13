@@ -71,12 +71,20 @@ def build_snapshot(session: Session, device: Device) -> dict:
     return snapshot
 
 
-def ingest_push(session: Session, push: DevicePush, received_at: datetime) -> dict:
+def ingest_push(
+    session: Session,
+    push: DevicePush,
+    received_at: datetime,
+    update_last_pushed: bool = True,
+) -> dict:
     """处理一次推送,返回三分支结果。
 
     - 库中无该 hostname -> created(创建设备+网卡+IP)
     - 有且无差异        -> unchanged(仅刷新 last_pushed_at)
     - 有差异            -> diff_created(合并进 pending,不改现有数据)
+
+    update_last_pushed=False 时 unchanged 分支不刷新 last_pushed_at
+    (CSV 回导等非真实推送场景,避免倒退最后推送时间)。
     """
     device = session.exec(
         select(Device).where(Device.hostname == push.hostname)
@@ -93,8 +101,9 @@ def ingest_push(session: Session, push: DevicePush, received_at: datetime) -> di
     snapshot = build_snapshot(session, device)
     diff = diff_push(snapshot, push)
     if not diff["has_changes"]:
-        device.last_pushed_at = to_naive_utc(push.timestamp or received_at)
-        session.add(device)
+        if update_last_pushed:
+            device.last_pushed_at = to_naive_utc(push.timestamp or received_at)
+            session.add(device)
         session.commit()
         return {
             "result": "unchanged",

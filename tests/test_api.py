@@ -229,6 +229,26 @@ def test_tags(client):
     r = client.get("/api/v1/devices", params={"tag": "测试"})
     assert r.json()["total"] == 0
 
+    # 精确匹配:旧实现为子串 LIKE,"生产" 会误命中 "生产基地"
+    client.post("/api/v1/devices", json=make_push(hostname="S1B02DC-VL102"))
+    client.put("/api/v1/devices/2/tags", json={"tags": ["生产基地"]})
+    r = client.get("/api/v1/devices", params={"tag": "生产"})
+    assert r.json()["total"] == 1  # 只命中标签恰好为 "生产" 的设备
+
+
+def test_import_csv_preserves_last_pushed_at(client):
+    """回导不倒退 last_pushed_at:unchanged 分支不刷新最后推送时间。"""
+    client.post("/api/v1/devices", json=make_push())
+    original = client.get("/api/v1/devices/1").json()["last_pushed_at"]
+
+    csv_content = client.get("/api/v1/devices/export/csv").text
+    client.post(
+        "/api/v1/devices/import/csv",
+        files={"file": ("devices.csv", csv_content.encode("utf-8"), "text/csv")},
+    )
+    after = client.get("/api/v1/devices/1").json()["last_pushed_at"]
+    assert after == original
+
 
 def test_batch_delete(client):
     client.post("/api/v1/devices", json=make_push())
@@ -335,7 +355,8 @@ def test_import_csv_skips_malformed_rows(client):
     )
     body = r.json()
     assert body["created"] == 1
-    assert len(body["errors"]) == 0  # 缺 hostname 的行直接跳过
+    assert len(body["errors"]) == 1  # 缺 hostname 的行记入 errors
+    assert "hostname" in body["errors"][0]
 
 
 def test_spa_fallback(client):

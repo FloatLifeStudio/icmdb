@@ -1,8 +1,9 @@
-"""SQLModel 表模型:devices / nics / nic_ips / pending_changes / change_history。"""
+"""SQLModel 表模型:device / device_tag / nic / nic_ip / memoryslot / cpu /
+disk / psu / pending_change / changehistory。"""
 
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Column, TEXT, UniqueConstraint
+from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -28,10 +29,21 @@ class Device(SQLModel, table=True):
     mgmt_ip: str | None = None
     mgmt_prefix_length: int | None = None
     last_pushed_at: datetime | None = None
-    # 逗号分隔的标签(CMDB 元数据,UI 可编辑,不属于采集数据)
-    tags: str = Field(default="", sa_column=Column(TEXT))
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
+
+
+class DeviceTag(SQLModel, table=True):
+    """设备标签(CMDB 元数据,UI 可编辑,不属于采集数据)。
+
+    一行一个 device-tag 对,精确匹配筛选;替代旧的逗号分隔 TEXT 列。
+    """
+
+    __table_args__ = (UniqueConstraint("device_id", "name"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    device_id: int = Field(foreign_key="device.id", index=True)
+    name: str = Field(index=True)
 
 
 class Nic(SQLModel, table=True):
