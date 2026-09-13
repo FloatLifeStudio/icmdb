@@ -5,6 +5,7 @@
 > 采集推送(POST /devices)是唯一的数据写入入口
 > 时间戳:响应中的时间统一为 naive UTC(无时区后缀),客户端应按 UTC 解析后
 > 转换为查看者本地时区显示,如 JS:`new Date(ts + 'Z')`
+> 完整推送示例见 [EXAMPLE.md](./EXAMPLE.md)
 
 ## 目录
 
