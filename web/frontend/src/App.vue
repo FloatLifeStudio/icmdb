@@ -31,6 +31,13 @@
   </el-container>
 </template>
 
+<style>
+/* 全局重置:去掉浏览器默认 8px 外边距(登录页渐变贴边,主布局撑满) */
+body {
+  margin: 0;
+}
+</style>
+
 <script setup lang="ts">
 import { provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
