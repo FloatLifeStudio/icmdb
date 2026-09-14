@@ -172,6 +172,13 @@ export interface HistoryRow {
   created_at: string
 }
 
+export interface UserInfo {
+  id: number
+  username: string
+  role: string
+  created_at: string
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
   if (!res.ok) {
@@ -256,9 +263,19 @@ export const api = {
     ),
 
   login: (username: string, password: string) =>
-    request<{ username: string }>(`${BASE}/auth/login`, json('POST', { username, password })),
+    request<{ username: string; role: string }>(`${BASE}/auth/login`, json('POST', { username, password })),
 
   logout: () => request<{ ok: boolean }>(`${BASE}/auth/logout`, json('POST', {})),
 
-  me: () => request<{ username: string }>(`${BASE}/auth/me`),
+  me: () => request<{ username: string; role: string }>(`${BASE}/auth/me`),
+
+  listUsers: () => request<{ items: UserInfo[] }>(`${BASE}/users`),
+
+  createUser: (body: { username: string; password: string; role: string }) =>
+    request<UserInfo>(`${BASE}/users`, json('POST', body)),
+
+  updateUser: (id: number, body: { password?: string; role?: string }) =>
+    request<UserInfo>(`${BASE}/users/${id}`, json('PUT', body)),
+
+  deleteUser: (id: number) => request<{ ok: boolean }>(`${BASE}/users/${id}`, { method: 'DELETE' }),
 }

@@ -17,7 +17,7 @@
       <template #header>
         <div class="card-header">
           <span>基本信息</span>
-          <el-button size="small" @click="openTagEdit">编辑标签</el-button>
+          <el-button v-if="isAdmin" size="small" @click="openTagEdit">编辑标签</el-button>
         </div>
       </template>
       <el-descriptions :column="3" border>
@@ -225,11 +225,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, TableInstance } from 'element-plus'
 import { api, DeviceOut, HistoryRow } from '../api'
 import DiffDetail from '../components/DiffDetail.vue'
+
+const userRole = inject('userRole', ref('viewer'))
+const isAdmin = computed(() => userRole.value === 'admin')
 
 const route = useRoute()
 const deviceId = Number(route.params.id)

@@ -1,7 +1,7 @@
 """SQLite 连接与建表(WAL 模式)。"""
 
 from sqlalchemy import event
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from cmdb.config import settings
 
@@ -121,7 +121,27 @@ def get_engine_cached():
         _engine = make_engine()
         init_db(_engine)
         migrate(_engine)
+        seed_admin(_engine)
     return _engine
+
+
+def seed_admin(engine) -> None:
+    """users 表为空时,按环境变量配置种子 admin 账号。"""
+    from cmdb.api.auth import hash_password
+    from cmdb.config import settings
+    from cmdb.models import User
+
+    with Session(engine) as session:
+        if session.exec(select(User)).first() is not None:
+            return
+        session.add(
+            User(
+                username=settings.admin_user,
+                password_hash=hash_password(settings.admin_password),
+                role="admin",
+            )
+        )
+        session.commit()
 
 
 def get_session():

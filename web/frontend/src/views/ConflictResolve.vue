@@ -35,7 +35,7 @@
             <el-table-column label="新值(推送)" min-width="180">
               <template #default="{ row }">{{ row.new ?? '-' }}</template>
             </el-table-column>
-            <el-table-column label="裁决" width="220">
+            <el-table-column v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="fieldChoices[row.field]">
                   <el-radio value="old">保留旧值</el-radio>
@@ -65,7 +65,7 @@
             <el-table-column label="新值(推送)" min-width="200">
               <template #default="{ row }">{{ partContent(nicRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column label="裁决" width="220">
+            <el-table-column v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="nicChoices[row.name]" v-if="row.name">
                   <el-radio value="old">{{ kindOldLabel[row.kind] }}</el-radio>
@@ -95,7 +95,7 @@
             <el-table-column label="新值(推送)" min-width="200">
               <template #default="{ row }">{{ partContent(memoryRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column label="裁决" width="220">
+            <el-table-column v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="memoryChoices[row.slot!]" v-if="row.slot">
                   <el-radio value="old">{{ memoryOldLabel[row.kind] }}</el-radio>
@@ -125,7 +125,7 @@
             <el-table-column label="新值(推送)" min-width="200">
               <template #default="{ row }">{{ partContent(cpuRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column label="裁决" width="220">
+            <el-table-column v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="cpuChoices[row.slot!]" v-if="row.slot">
                   <el-radio value="old">{{ cpuOldLabel[row.kind] }}</el-radio>
@@ -155,7 +155,7 @@
             <el-table-column label="新值(推送)" min-width="200">
               <template #default="{ row }">{{ partContent(diskRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column label="裁决" width="220">
+            <el-table-column v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group
                   v-model="diskChoices[row.serial_number!]"
@@ -188,7 +188,7 @@
             <el-table-column label="新值(推送)" min-width="200">
               <template #default="{ row }">{{ partContent(psuRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column label="裁决" width="220">
+            <el-table-column v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group
                   v-model="psuChoices[row.serial_number!]"
@@ -221,7 +221,7 @@
             <el-table-column label="新值(推送)" min-width="200">
               <template #default="{ row }">{{ partContent(gpuRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column label="裁决" width="220">
+            <el-table-column v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="gpuChoices[row.uuid!]" v-if="row.uuid">
                   <el-radio value="old">{{ gpuOldLabel[row.kind] }}</el-radio>
@@ -234,13 +234,16 @@
 
         <div
           class="actions"
-          v-if="pending.diff.fields.length || pending.diff.nics.length || pending.diff.memory?.length || pending.diff.cpus?.length || pending.diff.disks?.length || pending.diff.psus?.length"
+          v-if="isAdmin && hasEntries"
         >
           <el-button type="primary" :loading="resolving" @click="submit">
             提交裁决
           </el-button>
           <el-button @click="keepAllOld">全部保留旧值</el-button>
         </div>
+        <p class="readonly-hint" v-else-if="hasEntries">
+          当前账号为只读权限,仅可查看差异;如需裁决请联系管理员。
+        </p>
         <el-empty
           v-else
           description="该记录无差异条目"
@@ -254,12 +257,27 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, TableInstance } from 'element-plus'
 import { api, PendingChange } from '../api'
 
 // 裁决提交成功后通知侧边栏气泡立即刷新
 const refreshPendingCount = inject<() => void>('refreshPendingCount', () => {})
+const userRole = inject('userRole', ref('viewer'))
+const isAdmin = computed(() => userRole.value === 'admin')
+const hasEntries = computed(() => {
+  const d = pending.value?.diff
+  return Boolean(
+    d &&
+      (d.fields.length ||
+        d.nics.length ||
+        d.memory?.length ||
+        d.cpus?.length ||
+        d.disks?.length ||
+        d.psus?.length ||
+        d.gpus?.length),
+  )
+})
 
 const pendings = ref<PendingChange[]>([])
 const pending = ref<PendingChange | null>(null)
@@ -562,6 +580,11 @@ async function submit() {
 }
 .actions {
   margin-top: 4px;
+}
+.readonly-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 @media (max-width: 900px) {
   .page {

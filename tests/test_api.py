@@ -568,3 +568,59 @@ def test_login_flow(guest):
 
     guest.post("/api/v1/auth/logout")
     assert guest.get("/api/v1/devices").status_code == 401
+
+
+def _login_as(client, username, password):
+    return client.post("/api/v1/auth/login", json={"username": username, "password": password})
+
+
+def test_user_management_crud(client):
+    """admin 新增 viewer 用户,可登录;用户列表/删除正常。"""
+    r = client.post("/api/v1/users", json={"username": "ops1", "password": "ops123", "role": "viewer"})
+    assert r.status_code == 200
+    user_id = r.json()["id"]
+
+    users = client.get("/api/v1/users").json()["items"]
+    assert {u["username"] for u in users} >= {"admin", "ops1"}
+
+    # 新用户可登录
+    assert _login_as(client, "ops1", "ops123").status_code == 200
+
+    # 重置密码(切回 admin 操作)
+    assert _login_as(client, "admin", "admin").status_code == 200
+    assert client.put(f"/api/v1/users/{user_id}", json={"password": "newpass"}).status_code == 200
+    assert _login_as(client, "ops1", "ops123").status_code == 401
+    assert _login_as(client, "ops1", "newpass").status_code == 200
+    assert _login_as(client, "admin", "admin").status_code == 200
+
+    # 删除
+    assert client.delete(f"/api/v1/users/{user_id}").status_code == 200
+    assert _login_as(client, "ops1", "newpass").status_code == 401
+
+
+def test_last_admin_protected(client):
+    """不能删除/降级最后一个管理员。"""
+    admins = [u for u in client.get("/api/v1/users").json()["items"] if u["role"] == "admin"]
+    admin_id = admins[0]["id"]
+    assert client.delete(f"/api/v1/users/{admin_id}").status_code == 409
+    assert client.put(f"/api/v1/users/{admin_id}", json={"role": "viewer"}).status_code == 409
+
+
+def test_viewer_readonly_permissions(client):
+    """viewer 只可查看:裁决/删除/标签/用户管理均 403,GET 正常。"""
+    client.post("/api/v1/users", json={"username": "viewer1", "password": "v1pass", "role": "viewer"})
+    client.post("/api/v1/devices", json=make_push())
+    assert _login_as(client, "viewer1", "v1pass").status_code == 200
+
+    # GET 正常
+    assert client.get("/api/v1/devices").status_code == 200
+    assert client.get("/api/v1/dashboard").status_code == 200
+    assert client.get("/api/v1/auth/me").json()["role"] == "viewer"
+
+    # 写操作 403
+    assert client.post("/api/v1/pending-changes/1/resolve", json={}).status_code == 403
+    assert client.delete("/api/v1/devices/1").status_code == 403
+    assert client.post("/api/v1/devices/batch-delete", json={"ids": [1]}).status_code == 403
+    assert client.put("/api/v1/devices/1/tags", json={"tags": ["x"]}).status_code == 403
+    assert client.get("/api/v1/users").status_code == 403
+    assert client.post("/api/v1/users", json={"username": "x", "password": "y"}).status_code == 403

@@ -192,3 +192,13 @@ class ChangeHistory(SQLModel, table=True):
     source: str | None = None
     diff: dict | None = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class User(SQLModel, table=True):
+    """用户表:admin 可操作(裁决/删除/标签/用户管理),viewer 只可查看。"""
+
+    id: int | None = Field(default=None, primary_key=True)
+    username: str = Field(unique=True, index=True)
+    password_hash: str
+    role: str = Field(default="viewer", index=True)  # admin | viewer
+    created_at: datetime = Field(default_factory=utcnow)

@@ -19,6 +19,9 @@
             {{ pendingCount > 99 ? '99+' : pendingCount }}
           </span>
         </el-menu-item>
+        <el-menu-item v-if="role === 'admin'" index="/users">
+          <el-icon><User /></el-icon>用户管理
+        </el-menu-item>
       </el-menu>
       <div class="user">
         <span class="username">{{ username }}</span>
@@ -41,12 +44,13 @@ body {
 <script setup lang="ts">
 import { provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Monitor, EditPen, Odometer } from '@element-plus/icons-vue'
+import { Monitor, EditPen, Odometer, User } from '@element-plus/icons-vue'
 import { api } from './api'
 
 const route = useRoute()
 const pendingCount = ref(0)
 const username = ref('')
+const role = ref('viewer')
 
 // 待裁决数量气泡:进入应用、切换页面时刷新(裁决提交后由 ConflictResolve 调 loadPendingCount)
 async function loadPendingCount() {
@@ -58,11 +62,12 @@ async function loadPendingCount() {
   }
 }
 
-// 当前登录用户(顶栏展示);未登录静默
+// 当前登录用户与角色;未登录静默
 async function loadUsername() {
   try {
     const res = await api.me()
     username.value = res.username
+    role.value = res.role
   } catch {
     // 静默失败
   }
@@ -80,6 +85,7 @@ watch(() => route.path, loadPendingCount)
 loadPendingCount()
 loadUsername()
 provide('refreshPendingCount', loadPendingCount)
+provide('userRole', role)
 </script>
 
 <style scoped>

@@ -4,6 +4,7 @@
 > 响应格式:REST 风格,HTTP 状态码 + JSON body
 > 采集推送(POST /devices)是唯一的数据写入入口,**且不要求登录**(采集器无需改造)
 > 其余 API 要求登录(会话 cookie),登录接口见[用户登录](#8-用户登录)
+> 权限:admin 可操作(裁决/删除/标签/CSV 导入/用户管理),viewer 只可查看,写操作返回 403
 > 时间戳:响应中的时间统一为 naive UTC(无时区后缀),客户端应按 UTC 解析后
 > 转换为查看者本地时区显示,如 JS:`new Date(ts + 'Z')`
 > 完整推送示例见 [EXAMPLE.md](./EXAMPLE.md)
@@ -18,6 +19,7 @@
 - [设备扩展接口](#6-设备扩展接口)
 - [错误码](#7-错误码)
 - [用户登录](#8-用户登录)
+- [用户管理](#9-用户管理)
 
 ---
 
@@ -444,9 +446,10 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 
 ## 8. 用户登录
 
-单管理员账号,凭据由环境变量配置:`CMDB_ADMIN_USER` / `CMDB_ADMIN_PASSWORD`
-(默认 `admin` / `admin`)。登录后签发 HttpOnly 会话 cookie(HMAC 签名,
-默认 7 天,`CMDB_SESSION_EXPIRE_DAYS` 可配),后续请求自动携带。
+用户账号存 users 表(PBKDF2 哈希),首个 admin 账号由 `CMDB_ADMIN_USER` /
+`CMDB_ADMIN_PASSWORD`(默认 `admin` / `admin`)在首次启动时种子创建。
+登录后签发 HttpOnly 会话 cookie(HMAC 签名,默认 7 天,
+`CMDB_SESSION_EXPIRE_DAYS` 可配),后续请求自动携带。
 
 **登录范围**:仅 UI 及其调用的 API;`POST /api/v1/devices`(采集推送)保持开放。
 
@@ -464,7 +467,48 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 
 ### `GET /api/v1/auth/me`
 
-返回当前登录用户 `{"username": "admin"}`;未登录返回 401(UI 用它判断会话状态)。
+返回当前登录用户与角色 `{"username": "admin", "role": "admin"}`;未登录返回 401
+(UI 用它判断会话状态)。
+
+## 9. 用户管理
+
+仅 admin 可访问(其他用户返回 403)。角色两级:`admin`(可操作)与 `viewer`(只可查看)。
+首个 admin 账号由 `CMDB_ADMIN_USER` / `CMDB_ADMIN_PASSWORD` 在首次启动时种子创建;
+角色变更即时生效(无需重新登录)。
+
+### `GET /api/v1/users`
+
+返回全部用户:`{"items": [{"id": 1, "username": "admin", "role": "admin", "created_at": "..."}]}`
+
+### `POST /api/v1/users`
+
+```json
+{"username": "ops1", "password": "初始密码", "role": "viewer"}
+```
+
+`role` 只能是 `admin` / `viewer`(默认 viewer);用户名重复返回 409。
+
+### `PUT /api/v1/users/{id}` — 重置密码 / 修改角色
+
+```json
+{"password": "新密码"}
+```
+
+`password` 与 `role` 均可选,传哪个改哪个;不能降级最后一个管理员(409)。
+
+### `DELETE /api/v1/users/{id}` — 删除用户
+
+不能删除自己与最后一个管理员(409)。
+
+**权限矩阵**:
+
+| 操作 | admin | viewer |
+|---|---|---|
+| 采集推送(POST /devices,无需登录) | ✅ | ✅ |
+| 查看列表 / 详情 / 历史 / 仪表盘 | ✅ | ✅ |
+| 裁决 / 删除设备 / 批量删除 | ✅ | ❌ 403 |
+| 编辑标签 / CSV 导入 | ✅ | ❌ |
+| 用户管理 | ✅ | ❌ |
 
 ## 附:配置项(环境变量)
 

@@ -28,6 +28,7 @@
       <el-button type="primary" @click="load">刷新</el-button>
       <el-button @click="exportCsv">导出 CSV</el-button>
       <el-upload
+        v-if="isAdmin"
         :show-file-list="false"
         :auto-upload="false"
         accept=".csv"
@@ -36,6 +37,7 @@
         <el-button>导入 CSV</el-button>
       </el-upload>
       <el-popconfirm
+        v-if="isAdmin"
         title="确认批量删除选中的设备?(连带网卡数据,历史保留)"
         @confirm="batchRemove"
       >
@@ -55,7 +57,7 @@
       @sort-change="onSortChange"
       @selection-change="onSelectionChange"
     >
-      <el-table-column type="selection" width="45" />
+      <el-table-column v-if="isAdmin" type="selection" width="45" />
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="hostname" label="Hostname" min-width="180" sortable="custom">
         <template #default="{ row }">
@@ -84,7 +86,7 @@
       <el-table-column prop="last_pushed_at" label="上次推送" min-width="170" sortable="custom">
         <template #default="{ row }">{{ fmt(row.last_pushed_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right">
+      <el-table-column v-if="isAdmin" label="操作" width="100" fixed="right">
         <template #default="{ row }">
           <el-popconfirm
             title="确认删除该设备?(连带网卡数据,历史保留)"
@@ -112,9 +114,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api, DeviceOut } from '../api'
+
+const userRole = inject('userRole', ref('viewer'))
+const isAdmin = computed(() => userRole.value === 'admin')
 
 const items = ref<DeviceOut[]>([])
 const total = ref(0)

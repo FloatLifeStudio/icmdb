@@ -10,21 +10,31 @@ const router = createRouter({
     { path: '/devices', component: () => import('../views/DeviceList.vue') },
     { path: '/devices/:id', component: () => import('../views/DeviceDetail.vue') },
     { path: '/conflicts', component: () => import('../views/ConflictResolve.vue') },
+    { path: '/users', component: () => import('../views/Users.vue') },
   ],
 })
 
-// 路由守卫:未登录跳登录页(会话状态每次会话首次导航时向后端确认)
+// 路由守卫:未登录跳登录页;用户管理仅 admin(会话状态每次会话首次导航时向后端确认)
 let sessionChecked = false
 router.beforeEach(async (to) => {
   if (to.path === '/login') return true
-  if (sessionChecked) return true
-  try {
-    await api.me()
-    sessionChecked = true
-    return true
-  } catch {
-    return '/login'
+  if (!sessionChecked) {
+    try {
+      await api.me()
+      sessionChecked = true
+    } catch {
+      return '/login'
+    }
   }
+  if (to.path === '/users') {
+    try {
+      const me = await api.me()
+      if (me.role !== 'admin') return '/dashboard'
+    } catch {
+      return '/login'
+    }
+  }
+  return true
 })
 
 export default router
