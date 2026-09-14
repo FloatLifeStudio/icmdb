@@ -37,6 +37,7 @@ _MIGRATIONS = {
     "device": {
         "os_type": "VARCHAR",
         "os_version": "VARCHAR",
+        "os_virt": "VARCHAR",
         "kernel": "VARCHAR",
         "agent_version": "VARCHAR",
     },

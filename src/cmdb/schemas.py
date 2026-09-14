@@ -1,8 +1,15 @@
-"""Pydantic 推送体/响应模型,对应采集 JSON 结构。"""
+"""Pydantic 推送体/响应模型,对应采集 JSON 结构。
+
+对齐 iagent 采集器实采语义:
+- 单字段采集失败置 null,身份字段(网卡 name 之外的 slot/uuid/serial_number)可空,
+  身份为 null 的条目自动丢弃,不进 diff 与存储
+- 列表字段(nics.ips)可为 null
+- agent.timestamp 空串视为未采集
+"""
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class MgmtInfo(BaseModel):
@@ -21,11 +28,16 @@ class NicIPIn(BaseModel):
 
 
 class NicIn(BaseModel):
-    """推送体中的单块网卡,ips 数量不定。"""
+    """推送体中的单块网卡,ips 数量不定;采集器对无 IP 网卡置 ips=null。"""
 
     name: str
     mac: str | None = None
-    ips: list[NicIPIn] = []
+    ips: list[NicIPIn] | None = None
+
+    @field_validator("ips", mode="before")
+    @classmethod
+    def _none_ips(cls, v):
+        return v or []
 
 
 class AgentInfo(BaseModel):
@@ -37,20 +49,29 @@ class AgentInfo(BaseModel):
     # 全量同步标记:库中多出的硬件条目进 diff 候删;新格式默认全量
     full_sync: bool = True
 
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def _empty_timestamp(cls, v):
+        # 采集器未采集时间时发空串,视为未采集
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 
 class OsInfo(BaseModel):
-    """操作系统信息,hostname 为设备唯一匹配键。"""
+    """操作系统信息,hostname 为设备唯一匹配键;virt 为虚拟化类型(bare_metal/kvm/...)。"""
 
     hostname: str
     type: str | None = None
     version: str | None = None
     kernel: str | None = None
+    virt: str | None = None
 
 
 class GpuSlotIn(BaseModel):
-    """推送体中的单块 GPU,uuid 为身份。"""
+    """推送体中的单块 GPU,uuid 为身份(可为 null,自动丢弃)。"""
 
-    uuid: str
+    uuid: str | None = None
     name: str | None = None
     serial_number: str | None = None
     size: int | None = None
@@ -66,9 +87,9 @@ class GpuInfo(BaseModel):
 
 
 class MemorySlotIn(BaseModel):
-    """推送体中的单条内存,slot 为身份,如 DIMM_A1。"""
+    """推送体中的单条内存,slot 为身份(可为 null,自动丢弃),如 DIMM_A1。"""
 
-    slot: str
+    slot: str | None = None
     manufacturer: str | None = None
     part_number: str | None = None
     type: str | None = None
@@ -85,16 +106,16 @@ class MemoryInfo(BaseModel):
 
 
 class CpuSlotIn(BaseModel):
-    """推送体中的单颗 CPU,slot 为身份,如 CPU0。"""
+    """推送体中的单颗 CPU,slot 为身份(可为 null,自动丢弃),如 CPU0。"""
 
-    slot: str
+    slot: str | None = None
     model: str | None = None
 
 
 class DiskIn(BaseModel):
-    """推送体中的单块硬盘,serial_number 为身份,type 为 SSD / HDD。"""
+    """推送体中的单块硬盘,serial_number 为身份(可为 null,自动丢弃),type 为 SSD / HDD。"""
 
-    serial_number: str
+    serial_number: str | None = None
     type: str | None = None
     manufacturer: str | None = None
     model: str | None = None
@@ -103,16 +124,19 @@ class DiskIn(BaseModel):
 
 
 class PsuIn(BaseModel):
-    """推送体中的单个电源模块,serial_number 为身份。"""
+    """推送体中的单个电源模块,serial_number 为身份(可为 null,自动丢弃)。"""
 
-    serial_number: str
+    serial_number: str | None = None
     manufacturer: str | None = None
     model: str | None = None
     max_power_w: int | None = None
 
 
 class HardwareInfo(BaseModel):
-    """硬件信息,chassis_serial_number 为整机序列号。"""
+    """硬件信息,chassis_serial_number 为整机序列号。
+
+    身份字段为 null 的条目(采集失败的槽位)自动丢弃,不影响整包接收。
+    """
 
     chassis_serial_number: str | None = None
     nics: list[NicIn] = []
@@ -122,18 +146,42 @@ class HardwareInfo(BaseModel):
     psus: list[PsuIn] | None = None
     gpu: GpuInfo | None = None
 
+    @model_validator(mode="after")
+    def _drop_null_identity(self) -> "HardwareInfo":
+        if self.memory:
+            self.memory.slots = [s for s in self.memory.slots if s.slot]
+        if self.cpus:
+            self.cpus = [c for c in self.cpus if c.slot]
+        if self.disks:
+            self.disks = [d for d in self.disks if d.serial_number]
+        if self.psus:
+            self.psus = [p for p in self.psus if p.serial_number]
+        if self.gpu:
+            self.gpu.slots = [g for g in self.gpu.slots if g.uuid]
+        return self
+
 
 class DevicePush(BaseModel):
     """采集推送体(新格式):agent + os + mgmt + hardware。
 
     agent.timestamp 缺省时由服务器接收时间兜底;agent.full_sync=true(默认)
-    表示全量同步,库中多出的硬件条目进 diff 候删。
+    表示全量同步,库中多出的硬件条目进 diff 候删。mgmt/hardware 为 null 视为未采集。
     """
 
     agent: AgentInfo = AgentInfo()
     os: OsInfo
     mgmt: MgmtInfo = MgmtInfo()
     hardware: HardwareInfo = HardwareInfo()
+
+    @field_validator("mgmt", mode="before")
+    @classmethod
+    def _null_mgmt(cls, v):
+        return v or MgmtInfo()
+
+    @field_validator("hardware", mode="before")
+    @classmethod
+    def _null_hardware(cls, v):
+        return v or HardwareInfo()
 
 
 def normalise_legacy(raw: dict) -> dict:
@@ -226,6 +274,7 @@ class DeviceOut(BaseModel):
     os_type: str | None = None
     os_version: str | None = None
     kernel: str | None = None
+    os_virt: str | None = None
     agent_version: str | None = None
     mgmt_mac: str | None = None
     mgmt_ip: str | None = None

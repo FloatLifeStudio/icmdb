@@ -70,6 +70,7 @@ export interface DeviceOut {
   serial_number: string | null
   os_type: string | null
   os_version: string | null
+  os_virt: string | null
   kernel: string | null
   agent_version: string | null
   mgmt_mac: string | null

@@ -9,7 +9,8 @@
     "hostname": "S1A01DC-VL101",
     "type": "Linux",
     "version": "Ubuntu 22.04",
-    "kernel": "5.15.0-91-generic"
+    "kernel": "5.15.0-91-generic",
+    "virt": "kvm"
   },
   "mgmt": {
     "mac": "AA:BB:CC:DD:EE:01",

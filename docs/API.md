@@ -49,7 +49,8 @@
     "hostname": "S1A01DC-VL101",
     "type": "Linux",
     "version": "Ubuntu 22.04",
-    "kernel": "5.15.0-91-generic"
+    "kernel": "5.15.0-91-generic",
+    "virt": "bare_metal"
   },
   "mgmt": {
     "mac": "AA:BB:CC:DD:EE:01",
@@ -125,7 +126,7 @@
 | `agent.timestamp` | ❌ | 采集时间 ISO 8601(带时区,会归一化为 UTC);缺省用服务器接收时间 |
 | `agent.full_sync` | ❌ | 默认 **true**。**true = 全量同步**:库中多出的硬件条目进 diff 候删;false = 增量:库中多出的保持不动 |
 | `os.hostname` | ✅ | 设备唯一匹配键;主机改名 = 新设备 |
-| `os.type` / `os.version` / `os.kernel` | ❌ | OS 类型 / 版本 / 内核;未采集(None)不清空库中已有值 |
+| `os.type` / `os.version` / `os.kernel` / `os.virt` | ❌ | OS 类型 / 版本 / 内核 / 虚拟化类型(bare_metal/kvm/vmware/qemu/xen...);未采集(None)不清空库中已有值 |
 | `mgmt` | ❌ | 管理口信息:mac / ip / prefix_length |
 | `hardware.chassis_serial_number` | ❌ | 机箱序列号;未采集不清空库中已有值 |
 | `hardware.nics` | ❌ | 网卡数组,推多少收多少;`name` 是网卡身份 |
@@ -134,6 +135,14 @@
 | `hardware.disks` | ❌ | 硬盘数组,`serial_number` 是身份;字段含 type(SSD/HDD)/ manufacturer / model / size + size_unit(理论容量) |
 | `hardware.psus` | ❌ | 电源数组,`serial_number` 是身份;字段含 manufacturer / model / max_power_w(最大功率 W) |
 | `hardware.gpu` | ❌ | GPU 信息:`slots` 数组,`uuid` 是身份;字段含 name / serial_number / size + size_unit(显存)/ driver_version / pcie_id |
+
+**对齐 iagent 采集器实采语义**(v2.3 起):
+
+- 身份字段(网卡 `name` 之外的 slot / uuid / serial_number)可为 null:单字段采集
+  失败置 null,**身份为 null 的整条条目自动丢弃**,不进 diff 与存储,不影响整包接收
+- `mgmt` / `hardware` 可为 null:视为未采集,不清空库中已有数据
+- `nics[].ips` 可为 null:无 IP 网卡不发 IP
+- `agent.timestamp` 空串视为未采集,用服务器接收时间兜底
 
 **兼容旧格式**:仅含顶层 `hostname` 的旧版推送体仍可接收,服务端自动归一化为
 新结构(旧 `serial_number` → `hardware.chassis_serial_number`,旧顶层

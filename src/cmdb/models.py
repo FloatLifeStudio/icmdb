@@ -31,6 +31,7 @@ class Device(SQLModel, table=True):
     os_type: str | None = None
     os_version: str | None = None
     kernel: str | None = None
+    os_virt: str | None = None
     agent_version: str | None = None
     last_pushed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)

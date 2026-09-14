@@ -36,6 +36,9 @@
         <el-descriptions-item label="内核">
           {{ device.kernel || '-' }}
         </el-descriptions-item>
+        <el-descriptions-item label="虚拟化">
+          {{ device.os_virt || '-' }}
+        </el-descriptions-item>
         <el-descriptions-item label="采集器版本">
           {{ device.agent_version || '-' }}
         </el-descriptions-item>

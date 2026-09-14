@@ -212,6 +212,7 @@ def _to_out(session: Session, device: Device, children: _Children | None = None)
         serial_number=device.serial_number,
         os_type=device.os_type,
         os_version=device.os_version,
+        os_virt=device.os_virt,
         kernel=device.kernel,
         agent_version=device.agent_version,
         mgmt_mac=device.mgmt_mac,
@@ -401,9 +402,10 @@ def export_csv(session: Session = Depends(get_session)):
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(
-        ["hostname", "serial_number", "os_type", "os_version", "kernel",
-         "agent_version", "mgmt_mac", "mgmt_ip", "mgmt_prefix_length",
-         "tags", "status", "last_pushed_at", "nics", "gpu"]
+        ["hostname", "serial_number", "os_type", "os_version", "os_virt",
+         "kernel", "agent_version", "mgmt_mac", "mgmt_ip",
+         "mgmt_prefix_length", "tags", "status", "last_pushed_at", "nics",
+         "gpu"]
     )
     for d in session.exec(select(Device).order_by(Device.hostname)).all():
         nics = session.exec(select(Nic).where(Nic.device_id == d.id)).all()
@@ -428,6 +430,7 @@ def export_csv(session: Session = Depends(get_session)):
                 d.serial_number or "",
                 d.os_type or "",
                 d.os_version or "",
+                d.os_virt or "",
                 d.kernel or "",
                 d.agent_version or "",
                 d.mgmt_mac or "",

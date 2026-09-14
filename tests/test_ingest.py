@@ -211,3 +211,114 @@ def test_real_collector_example_json(engine):
         # 再次推送一致数据 -> unchanged
         again = ingest_push(session, push, RECEIVED_AT)
         assert again["result"] == "unchanged"
+
+
+def test_iagent_format_payload(engine):
+    """iagent 采集器实采格式:virt 字段、null 身份条目丢弃、ips=null、
+    mgmt=null、timestamp 空串兜底。"""
+    raw = {
+        "agent": {"version": "0.3.0", "source": "iagent", "timestamp": "",
+                  "full_sync": True},
+        "os": {
+            "hostname": "GPU-NODE-07",
+            "type": "linux",
+            "version": "Ubuntu 22.04",
+            "kernel": "5.15.0-91-generic",
+            "virt": "kvm",
+        },
+        "mgmt": None,
+        "hardware": {
+            "chassis_serial_number": None,
+            "nics": [
+                {"name": "eth0", "mac": "D0:8D:7D:C2:F7:2A", "ips": None},
+                {"name": "eth1", "mac": None,
+                 "ips": [{"ip": "10.20.0.7", "prefix_length": 24}]},
+            ],
+            "memory": {
+                "slots": [
+                    {"slot": "DIMM_A1", "size": 32, "size_unit": "GB"},
+                    # 采集失败的槽位:slot 为 null,整条丢弃
+                    {"slot": None, "size": None, "size_unit": None},
+                ]
+            },
+            "cpus": [
+                {"slot": "CPU0", "model": "Intel(R) Xeon Platinum 8470"},
+                {"slot": None, "model": None},
+            ],
+            "disks": [
+                {"serial_number": "S5XNX0GF123456", "type": "SSD",
+                 "size": 480, "size_unit": "GB"},
+                # SN 采集失败 -> 丢弃
+                {"serial_number": None, "type": "HDD"},
+            ],
+            "psus": [{"serial_number": None, "max_power_w": 2700}],
+            "gpu": {
+                "slots": [
+                    {"uuid": "GPU-9a2b3c4d", "name": "NVIDIA A800-SXM4-80GB",
+                     "size": 80, "size_unit": "GB"},
+                    # uuid 采集失败 -> 丢弃
+                    {"uuid": None, "name": "NVIDIA A800-SXM4-80GB"},
+                ]
+            },
+        },
+    }
+    push = DevicePush(**raw)
+    # null 身份条目在 schema 层被丢弃
+    assert len(push.hardware.memory.slots) == 1
+    assert len(push.hardware.cpus) == 1
+    assert len(push.hardware.disks) == 1
+    assert len(push.hardware.psus) == 0
+    assert len(push.hardware.gpu.slots) == 1
+
+    with Session(engine) as session:
+        result = ingest_push(session, push, RECEIVED_AT)
+        assert result["result"] == "created"
+
+        device = get_device(session, "GPU-NODE-07")
+        assert device.os_virt == "kvm"
+        assert device.os_type == "linux"
+        # timestamp 空串 -> 未采集,取接收时间兜底
+        assert device.last_pushed_at == RECEIVED_AT
+        # mgmt=null -> 不写管理口
+        assert device.mgmt_mac is None and device.mgmt_ip is None
+
+        nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
+        assert len(nics) == 2
+        nic0 = next(n for n in nics if n.name == "eth0")
+        nic1 = next(n for n in nics if n.name == "eth1")
+        assert nic0.mac == "D0:8D:7D:C2:F7:2A"
+        # eth0 ips=null -> 无 IP;eth1 有 IP
+        assert session.exec(
+            select(NicIP).where(NicIP.nic_id == nic0.id)
+        ).all() == []
+        ips1 = session.exec(select(NicIP).where(NicIP.nic_id == nic1.id)).all()
+        assert [(i.ip, i.prefix_length) for i in ips1] == [("10.20.0.7", 24)]
+
+        # 一致数据重推 -> unchanged(不产生 pending)
+        again = ingest_push(session, push, RECEIVED_AT)
+        assert again["result"] == "unchanged"
+
+
+def test_iagent_virt_change_goes_to_diff(engine):
+    """virt 变化进主机字段 diff。"""
+    with Session(engine) as session:
+        first = make_push(
+            hostname="S1A01DC-VL101",
+            os={"hostname": "S1A01DC-VL101", "virt": "bare_metal"},
+        )
+        result = ingest_push(session, first, RECEIVED_AT)
+        assert result["result"] == "created"
+
+        second = make_push(
+            hostname="S1A01DC-VL101",
+            os={"hostname": "S1A01DC-VL101", "virt": "kvm"},
+        )
+        result = ingest_push(session, second, RECEIVED_AT)
+        assert result["result"] == "diff_created"
+        pending = session.exec(select(PendingChange)).first()
+        virt_entries = [
+            e for e in pending.diff["fields"] if e["field"] == "os.virt"
+        ]
+        assert virt_entries == [
+            {"field": "os.virt", "old": "bare_metal", "new": "kvm"}
+        ]
