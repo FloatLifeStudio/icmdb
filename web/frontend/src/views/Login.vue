@@ -59,6 +59,7 @@ async function submit() {
 
 <style scoped>
 .login-page {
+  width: 100%;
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -69,6 +70,8 @@ async function submit() {
 .wrapper {
   position: relative;
   padding: 60px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* 装饰圆:毛玻璃卡片后方呼应背景渐变 */
@@ -183,5 +186,15 @@ button:hover {
 button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* 窄屏:减小留白,卡片随屏宽自适应 */
+@media (max-width: 520px) {
+  .wrapper {
+    padding: 20px;
+  }
+  .form {
+    width: 100%;
+  }
 }
 </style>

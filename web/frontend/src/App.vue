@@ -111,6 +111,7 @@ provide('refreshPendingCount', loadPendingCount)
 }
 .bare {
   min-height: 100vh;
+  display: block;
 }
 .user {
   position: absolute;
