@@ -465,6 +465,16 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 
 清除会话 cookie,返回 `{"ok": true}`。
 
+### `POST /api/v1/auth/change-password`
+
+当前登录用户修改自己的密码(需验证原密码),所有角色可用:
+
+```json
+{"old_password": "原密码", "new_password": "新密码"}
+```
+
+原密码错误返回 401。
+
 ### `GET /api/v1/auth/me`
 
 返回当前登录用户与角色 `{"username": "admin", "role": "admin"}`;未登录返回 401

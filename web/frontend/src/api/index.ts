@@ -267,6 +267,12 @@ export const api = {
 
   logout: () => request<{ ok: boolean }>(`${BASE}/auth/logout`, json('POST', {})),
 
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request<{ ok: boolean }>(
+      `${BASE}/auth/change-password`,
+      json('POST', { old_password: oldPassword, new_password: newPassword }),
+    ),
+
   me: () => request<{ username: string; role: string }>(`${BASE}/auth/me`),
 
   listUsers: () => request<{ items: UserInfo[] }>(`${BASE}/users`),

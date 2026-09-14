@@ -25,12 +25,31 @@
       </el-menu>
       <div class="user">
         <span class="username">{{ username }}</span>
+        <el-button link type="primary" @click="openChangePassword">修改密码</el-button>
         <el-button link type="primary" @click="logout">退出</el-button>
       </div>
     </el-aside>
     <el-main class="main">
       <router-view />
     </el-main>
+
+    <el-dialog v-model="pwdVisible" title="修改密码" width="400px">
+      <el-form label-width="80px">
+        <el-form-item label="原密码">
+          <el-input v-model="pwdForm.old" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="新密码">
+          <el-input v-model="pwdForm.new" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="确认新密码">
+          <el-input v-model="pwdForm.confirm" type="password" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="pwdVisible = false">取消</el-button>
+        <el-button type="primary" @click="changePassword">确认修改</el-button>
+      </template>
+    </el-dialog>
   </el-container>
 </template>
 
@@ -43,6 +62,7 @@ body {
 
 <script setup lang="ts">
 import { provide, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 import { Monitor, EditPen, Odometer, User } from '@element-plus/icons-vue'
 import { api } from './api'
@@ -78,6 +98,33 @@ async function logout() {
     await api.logout()
   } finally {
     window.location.href = '/login'
+  }
+}
+
+// 修改自己的密码(所有角色可用)
+const pwdVisible = ref(false)
+const pwdForm = ref({ old: '', new: '', confirm: '' })
+
+function openChangePassword() {
+  pwdForm.value = { old: '', new: '', confirm: '' }
+  pwdVisible.value = true
+}
+
+async function changePassword() {
+  if (!pwdForm.value.old || !pwdForm.value.new) {
+    ElMessage.warning('请填写原密码和新密码')
+    return
+  }
+  if (pwdForm.value.new !== pwdForm.value.confirm) {
+    ElMessage.warning('两次输入的新密码不一致')
+    return
+  }
+  try {
+    await api.changePassword(pwdForm.value.old, pwdForm.value.new)
+    pwdVisible.value = false
+    ElMessage.success('密码已修改')
+  } catch (e) {
+    ElMessage.error((e as Error).message)
   }
 }
 

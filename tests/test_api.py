@@ -624,3 +624,16 @@ def test_viewer_readonly_permissions(client):
     assert client.put("/api/v1/devices/1/tags", json={"tags": ["x"]}).status_code == 403
     assert client.get("/api/v1/users").status_code == 403
     assert client.post("/api/v1/users", json={"username": "x", "password": "y"}).status_code == 403
+
+
+def test_change_own_password(client):
+    """当前用户修改自己的密码:验证原密码,所有角色可用。"""
+    r = client.post("/api/v1/auth/change-password", json={"old_password": "wrong", "new_password": "newpass"})
+    assert r.status_code == 401
+
+    r = client.post("/api/v1/auth/change-password", json={"old_password": "admin", "new_password": "newpass"})
+    assert r.status_code == 200
+
+    # 旧密码失效,新密码可登录
+    assert _login_as(client, "admin", "admin").status_code == 401
+    assert _login_as(client, "admin", "newpass").status_code == 200

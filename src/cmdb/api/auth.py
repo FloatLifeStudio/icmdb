@@ -72,6 +72,11 @@ class LoginIn(BaseModel):
     password: str
 
 
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str
+
+
 @router.post("/login")
 def login(body: LoginIn, response: Response):
     """校验 users 表账号密码,签发会话 cookie。"""
@@ -92,6 +97,29 @@ def login(body: LoginIn, response: Response):
         max_age=settings.session_expire_days * 86400,
     )
     return {"username": user.username, "role": user.role}
+
+
+@router.post("/change-password")
+def change_password(body: ChangePasswordIn, cmdb_session: str | None = Cookie(default=None, alias=SESSION_COOKIE)):
+    """当前登录用户修改自己的密码(需验证原密码),所有角色可用。"""
+    from cmdb.database import get_engine_cached
+    from cmdb.models import User
+
+    username = token_username(cmdb_session)
+    if not username:
+        raise HTTPException(status_code=401, detail="未登录")
+    with Session(get_engine_cached()) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="用户不存在")
+        if not verify_password(body.old_password, user.password_hash):
+            raise HTTPException(status_code=401, detail="原密码错误")
+        if not body.new_password:
+            raise HTTPException(status_code=422, detail="新密码不能为空")
+        user.password_hash = hash_password(body.new_password)
+        session.add(user)
+        session.commit()
+    return {"ok": True}
 
 
 @router.post("/logout")
