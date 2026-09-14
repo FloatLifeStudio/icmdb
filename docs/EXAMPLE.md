@@ -17,7 +17,8 @@
     "hostname": "S1A01DC-GPU01",
     "type": "Linux",
     "version": "Ubuntu 22.04",
-    "kernel": "5.15.0-91-generic"
+    "kernel": "5.15.0-91-generic",
+    "virt": "bare_metal"
   },
   "mgmt": {
     "mac": "AA:BB:CC:DD:EE:01",
@@ -363,6 +364,58 @@
 - 所有硬件段均可选,不推不影响现有推送;`hardware.memory` / `cpus` / `disks` / `psus` / `gpu` 缺省即不更新对应类别
 - `agent.full_sync=true`(默认)= 全量同步:库中多出的网卡/内存/CPU/硬盘/电源/GPU 进 diff 候删
 
+## iagent 采集器实采格式
+
+iagent(Go 采集器)按同一四段结构推送,但对齐实采语义:**单字段采集失败置 null,
+身份为 null 的整条条目自动丢弃**(不进 diff 与存储),`mgmt` / `hardware` /
+`nics[].ips` 可为 null,`agent.timestamp` 未采集时发空串。典型推送体:
+
+```json
+{
+  "agent": {"version": "0.3.0", "source": "iagent", "timestamp": "", "full_sync": true},
+  "os": {
+    "hostname": "GPU-NODE-07",
+    "type": "linux",
+    "version": "Ubuntu 22.04",
+    "kernel": "5.15.0-91-generic",
+    "virt": "kvm"
+  },
+  "mgmt": null,
+  "hardware": {
+    "chassis_serial_number": null,
+    "nics": [
+      {"name": "eth0", "mac": "D0:8D:7D:C2:F7:2A", "ips": null},
+      {"name": "eth1", "mac": null, "ips": [{"ip": "10.20.0.7", "prefix_length": 24}]}
+    ],
+    "memory": {
+      "slots": [
+        {"slot": "DIMM_A1", "size": 32, "size_unit": "GB"},
+        {"slot": null, "size": null}
+      ]
+    },
+    "cpus": [
+      {"slot": "CPU0", "model": "Intel(R) Xeon Platinum 8470"},
+      {"slot": null, "model": null}
+    ],
+    "disks": [
+      {"serial_number": "S5XNX0GF123456", "type": "SSD", "size": 480, "size_unit": "GB"},
+      {"serial_number": null, "type": "HDD"}
+    ],
+    "psus": [{"serial_number": null, "max_power_w": 2700}],
+    "gpu": {
+      "slots": [
+        {"uuid": "GPU-9a2b3c4d", "name": "NVIDIA A800-SXM4-80GB", "size": 80, "size_unit": "GB"},
+        {"uuid": null, "name": null}
+      ]
+    }
+  }
+}
+```
+
+服务端处理效果:身份为 null 的条目(空槽位内存、无 uuid 的 GPU、无 SN 的电源等)
+整条丢弃;`mgmt=null` 不写管理口;`timestamp=""` 取服务器接收时间兜底;
+`os.virt` 入库并在虚拟化类型变化时进 diff。
+
 ## 推送命令
 
 ```bash
@@ -374,7 +427,8 @@ curl -X POST http://<host>:8080/api/v1/devices \
 ## 测试场景
 
 1. **首次推送** → `created`(hostname 不存在)或 `diff_created`(已存在,硬件条目作为新增条目进裁决)
-2. **字段变化再推**(如 DIMM_A1 换型号、CPU 换型号)→ `diff_created`,字段级 changed
+2. **字段变化再推**(如 DIMM_A1 换型号、CPU 换型号、`os.virt` 变化)→ `diff_created`,字段级 changed
 3. **full_sync=true 少一块硬件**(如删掉 DIMM_B1 或一块硬盘)→ 进 diff 候删,裁决选 `new` 即删除
 4. **重复推送相同数据** → `unchanged`
-5. **裁决**:`POST /api/v1/pending-changes/{id}/resolve`,请求体逐条目选 `new` / `old`(默认 UI 全选新值);生效后写变更历史
+5. **iagent 格式推送**(含 null 身份条目)→ null 条目丢弃,其余正常入库
+6. **裁决**:`POST /api/v1/pending-changes/{id}/resolve`,请求体逐条目选 `new` / `old`(默认 UI 全选新值);生效后写变更历史

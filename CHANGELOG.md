@@ -2,6 +2,23 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/),版本号遵循语义化版本。
 
+## Unreleased
+
+### 新增
+
+- **用户管理**:admin / viewer 两级角色(viewer 只可查看,写操作 403);
+  admin 可创建 / 删除用户、重置密码、变更角色,最后一个管理员保护
+- **修改自己密码**:`POST /api/v1/auth/change-password`,所有角色可用,需验证原密码
+- **`os.virt` 虚拟化类型**:推送 / 存储 / diff / 设备详情 / CSV 全链路
+  (bare_metal/kvm/vmware/qemu/xen...);旧库自动迁移补列
+
+### 对齐
+
+- **iagent 采集器实采语义**(`POST /api/v1/devices`):身份字段
+  (slot / uuid / serial_number)可空,身份为 null 的条目自动丢弃;
+  `mgmt` / `hardware` / `nics[].ips` 可为 null(未采集不清空库中数据);
+  `agent.timestamp` 空串视为未采集,用服务器接收时间兜底
+
 ## v2.2.0 - 2026-09-13
 
 ### 新增

@@ -9,13 +9,13 @@ CMDB(CMDB v2)—— 采集推送、字段级 diff 冲突裁决、存储与展示
 已逐项确认的核心取舍:
 
 - **设备标识**:hostname(唯一匹配键;主机改名 = 新设备 + 旧设备残留,需手工删旧)
-- **推送格式**:`agent` / `os` / `mgmt` / `hardware` 四段结构(v2.2);仅含顶层 hostname 的旧格式自动归一化兼容
+- **推送格式**:`agent` / `os` / `mgmt` / `hardware` 四段结构(v2.2);对齐 iagent 采集器实采语义(v2.3):身份字段可空、身份为 null 的条目自动丢弃、`mgmt` / `hardware` / `ips` 可为 null;仅含顶层 hostname 的旧格式自动归一化兼容
 - **nics 语义**:推送体显式标记全量(`agent.full_sync=true`,库中多出的进 diff 候删)/ 增量(只存推送的)
 - **冲突裁决**:字段级 diff;同设备已有 pending 时以最新一次推送重算 diff 整体替换(不累计);裁决生效后写 change_history
-- **硬件扩展**:网卡(`name` 为身份)、内存/CPU(`slot` 为身份)、硬盘/电源(`serial_number` 为身份)、GPU(`uuid` 为身份);字段可选,不推不更新对应类别
+- **硬件扩展**:网卡(`name` 为身份)、内存/CPU(`slot` 为身份)、硬盘/电源(`serial_number` 为身份)、GPU(`uuid` 为身份);OS 含虚拟化类型 `os.virt`;字段可选,不推不更新对应类别
 - **疑似下线**:查询时动态计算,默认 3 天阈值(`CMDB_OFFLINE_THRESHOLD_DAYS` 可配),数据不自动删
-- **UI 写入权限**:推送 API 为唯一数据写入入口,UI 只读 + 裁决
-- **登录**:单管理员账号(env 配置)保护 UI 及其调用的 API;推送接口不鉴权,采集器无需改造
+- **写入权限**:推送 API 为唯一数据写入入口;UI 支持裁决、删除、标签、CSV 导入等管理操作
+- **用户与角色**:admin(可操作)/ viewer(只可查看)两级角色,admin 可管理用户、重置密码;所有用户可改自己密码;推送接口不鉴权,采集器无需改造
 - **删除语义**:DELETE 硬删设备与网卡、内存、CPU、硬盘、电源、GPU 数据,change_history 保留(追溯价值)
 
 ## 技术栈
