@@ -9,15 +9,15 @@
         :max-height="listMaxHeight"
         @current-change="selectPending"
       >
-        <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="device_id" label="设备 ID" width="80" />
-        <el-table-column prop="source" label="来源" width="110">
+        <el-table-column resizable prop="id" label="ID" width="60" />
+        <el-table-column resizable prop="device_id" label="设备 ID" width="80" />
+        <el-table-column resizable prop="source" label="来源" width="110">
           <template #default="{ row }">{{ row.source || '-' }}</template>
         </el-table-column>
-        <el-table-column label="推送时间" min-width="150">
+        <el-table-column resizable label="推送时间" min-width="150">
           <template #default="{ row }">{{ fmt(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="90" />
+        <el-table-column resizable prop="status" label="状态" width="90" />
       </el-table>
     </el-card>
 
@@ -26,16 +26,16 @@
         <el-card class="card">
           <template #header>主机字段差异(设备 #{{ pending.device_id }})</template>
           <el-table :data="pending.diff.fields" border>
-            <el-table-column label="字段" min-width="140">
+            <el-table-column resizable label="字段" min-width="140" show-overflow-tooltip>
               <template #default="{ row }">{{ fieldLabel(row.field) }}</template>
             </el-table-column>
-            <el-table-column label="旧值(库中)" min-width="180">
+            <el-table-column resizable label="旧值(库中)" min-width="180" show-overflow-tooltip>
               <template #default="{ row }">{{ row.old ?? '-' }}</template>
             </el-table-column>
-            <el-table-column label="新值(推送)" min-width="180">
+            <el-table-column resizable label="新值(推送)" min-width="180" show-overflow-tooltip>
               <template #default="{ row }">{{ row.new ?? '-' }}</template>
             </el-table-column>
-            <el-table-column v-if="isAdmin" label="裁决" width="220">
+            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="fieldChoices[row.field]">
                   <el-radio value="old">保留旧值</el-radio>
@@ -49,23 +49,23 @@
         <el-card class="card" v-if="pending.diff.nics.length">
           <template #header>网卡</template>
           <el-table :data="pending.diff.nics" border>
-            <el-table-column label="网卡" width="110">
+            <el-table-column resizable label="网卡" width="110">
               <template #default="{ row }">{{ row.name }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column resizable label="状态" width="80">
               <template #default="{ row }">
                 <el-tag :type="kindTag[row.kind]" size="small">
                   {{ kindLabel[row.kind] }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="旧值(库中)" min-width="200">
+            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(nicRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column label="新值(推送)" min-width="200">
+            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(nicRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column v-if="isAdmin" label="裁决" width="220">
+            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="nicChoices[row.name]" v-if="row.name">
                   <el-radio value="old">{{ kindOldLabel[row.kind] }}</el-radio>
@@ -79,23 +79,23 @@
         <el-card class="card" v-if="pending.diff.memory?.length">
           <template #header>内存</template>
           <el-table :data="pending.diff.memory" border>
-            <el-table-column label="槽位" width="120">
+            <el-table-column resizable label="槽位" width="120">
               <template #default="{ row }">{{ row.slot }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column resizable label="状态" width="80">
               <template #default="{ row }">
                 <el-tag :type="kindTag[row.kind]" size="small">
                   {{ kindLabel[row.kind] }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="旧值(库中)" min-width="200">
+            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(memoryRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column label="新值(推送)" min-width="200">
+            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(memoryRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column v-if="isAdmin" label="裁决" width="220">
+            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="memoryChoices[row.slot!]" v-if="row.slot">
                   <el-radio value="old">{{ memoryOldLabel[row.kind] }}</el-radio>
@@ -109,23 +109,23 @@
         <el-card class="card" v-if="pending.diff.cpus?.length">
           <template #header>CPU</template>
           <el-table :data="pending.diff.cpus" border>
-            <el-table-column label="槽位" width="120">
+            <el-table-column resizable label="槽位" width="120">
               <template #default="{ row }">{{ row.slot }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column resizable label="状态" width="80">
               <template #default="{ row }">
                 <el-tag :type="kindTag[row.kind]" size="small">
                   {{ kindLabel[row.kind] }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="旧值(库中)" min-width="200">
+            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(cpuRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column label="新值(推送)" min-width="200">
+            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(cpuRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column v-if="isAdmin" label="裁决" width="220">
+            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="cpuChoices[row.slot!]" v-if="row.slot">
                   <el-radio value="old">{{ cpuOldLabel[row.kind] }}</el-radio>
@@ -139,23 +139,23 @@
         <el-card class="card" v-if="pending.diff.disks?.length">
           <template #header>硬盘</template>
           <el-table :data="pending.diff.disks" border>
-            <el-table-column label="SN" width="130">
+            <el-table-column resizable label="SN" width="130">
               <template #default="{ row }">{{ row.serial_number }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column resizable label="状态" width="80">
               <template #default="{ row }">
                 <el-tag :type="kindTag[row.kind]" size="small">
                   {{ kindLabel[row.kind] }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="旧值(库中)" min-width="200">
+            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(diskRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column label="新值(推送)" min-width="200">
+            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(diskRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column v-if="isAdmin" label="裁决" width="220">
+            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group
                   v-model="diskChoices[row.serial_number!]"
@@ -172,23 +172,23 @@
         <el-card class="card" v-if="pending.diff.psus?.length">
           <template #header>电源</template>
           <el-table :data="pending.diff.psus" border>
-            <el-table-column label="SN" width="130">
+            <el-table-column resizable label="SN" width="130">
               <template #default="{ row }">{{ row.serial_number }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column resizable label="状态" width="80">
               <template #default="{ row }">
                 <el-tag :type="kindTag[row.kind]" size="small">
                   {{ kindLabel[row.kind] }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="旧值(库中)" min-width="200">
+            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(psuRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column label="新值(推送)" min-width="200">
+            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(psuRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column v-if="isAdmin" label="裁决" width="220">
+            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group
                   v-model="psuChoices[row.serial_number!]"
@@ -205,23 +205,23 @@
         <el-card class="card" v-if="pending.diff.gpus?.length">
           <template #header>GPU</template>
           <el-table :data="pending.diff.gpus" border>
-            <el-table-column label="UUID" width="130">
+            <el-table-column resizable label="UUID" width="130">
               <template #default="{ row }">{{ row.uuid }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column resizable label="状态" width="80">
               <template #default="{ row }">
                 <el-tag :type="kindTag[row.kind]" size="small">
                   {{ kindLabel[row.kind] }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="旧值(库中)" min-width="200">
+            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(gpuRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column label="新值(推送)" min-width="200">
+            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(gpuRepr, row, 'new') }}</template>
             </el-table-column>
-            <el-table-column v-if="isAdmin" label="裁决" width="220">
+            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
               <template #default="{ row }">
                 <el-radio-group v-model="gpuChoices[row.uuid!]" v-if="row.uuid">
                   <el-radio value="old">{{ gpuOldLabel[row.kind] }}</el-radio>

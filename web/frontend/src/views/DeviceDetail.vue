@@ -72,9 +72,9 @@
     <el-card v-if="device" class="card">
       <template #header>网卡与 IP</template>
       <el-table :data="device.nics" border>
-        <el-table-column resizable prop="name" label="网卡" width="120" />
-        <el-table-column resizable prop="mac" label="MAC" min-width="160" />
-        <el-table-column resizable label="IP 列表" min-width="280">
+        <el-table-column resizable prop="name" label="网卡" width="120" show-overflow-tooltip/>
+        <el-table-column resizable prop="mac" label="MAC" min-width="160" show-overflow-tooltip/>
+        <el-table-column resizable label="IP 列表" min-width="280" show-overflow-tooltip>
           <template #default="{ row }">
             <el-tag
               v-for="ip in row.ips"
@@ -93,25 +93,25 @@
     <el-card v-if="device && device.memory.length" class="card">
       <template #header>内存</template>
       <el-table :data="device.memory" border>
-        <el-table-column resizable prop="slot" label="槽位" width="110" />
+        <el-table-column resizable prop="slot" label="槽位" width="110" show-overflow-tooltip/>
         <el-table-column resizable prop="manufacturer" label="厂商" min-width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ row.manufacturer || '-' }}</template>
         </el-table-column>
         <el-table-column resizable prop="part_number" label="型号" min-width="190" show-overflow-tooltip>
           <template #default="{ row }">{{ row.part_number || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="type" label="代数" width="90">
+        <el-table-column resizable prop="type" label="代数" width="90" show-overflow-tooltip>
           <template #default="{ row }">{{ row.type || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="容量" width="100">
+        <el-table-column resizable label="容量" width="100" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
           </template>
         </el-table-column>
-        <el-table-column resizable label="频率" width="110">
+        <el-table-column resizable label="频率" width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ row.speed_mts ? row.speed_mts + 'MT/s' : '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="serial_number" label="SN" min-width="130">
+        <el-table-column resizable prop="serial_number" label="SN" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.serial_number || '-' }}</template>
         </el-table-column>
       </el-table>
@@ -120,15 +120,15 @@
     <el-card v-if="device && device.cpus.length" class="card">
       <template #header>CPU</template>
       <el-table :data="device.cpus" border>
-        <el-table-column resizable prop="slot" label="槽位" width="110" />
-        <el-table-column resizable prop="model" label="型号" min-width="300" />
+        <el-table-column resizable prop="slot" label="槽位" width="110" show-overflow-tooltip/>
+        <el-table-column resizable prop="model" label="型号" min-width="300" show-overflow-tooltip/>
       </el-table>
     </el-card>
 
     <el-card v-if="device && device.disks.length" class="card">
       <template #header>硬盘</template>
       <el-table :data="device.disks" border>
-        <el-table-column resizable prop="type" label="类型" width="90">
+        <el-table-column resizable prop="type" label="类型" width="90" show-overflow-tooltip>
           <template #default="{ row }">{{ row.type || '-' }}</template>
         </el-table-column>
         <el-table-column resizable prop="manufacturer" label="品牌" min-width="110" show-overflow-tooltip>
@@ -137,12 +137,12 @@
         <el-table-column resizable prop="model" label="型号" min-width="190" show-overflow-tooltip>
           <template #default="{ row }">{{ row.model || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="容量" width="110">
+        <el-table-column resizable label="容量" width="110" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
           </template>
         </el-table-column>
-        <el-table-column resizable prop="serial_number" label="SN" min-width="130" />
+        <el-table-column resizable prop="serial_number" label="SN" min-width="130" show-overflow-tooltip/>
       </el-table>
     </el-card>
 
@@ -155,12 +155,12 @@
         <el-table-column resizable prop="model" label="型号" min-width="190" show-overflow-tooltip>
           <template #default="{ row }">{{ row.model || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="最大功率" width="130">
+        <el-table-column resizable label="最大功率" width="130" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.max_power_w ? row.max_power_w + 'W' : '-' }}
           </template>
         </el-table-column>
-        <el-table-column resizable prop="serial_number" label="SN" min-width="130" />
+        <el-table-column resizable prop="serial_number" label="SN" min-width="130" show-overflow-tooltip/>
       </el-table>
     </el-card>
 
@@ -170,18 +170,18 @@
         <el-table-column resizable prop="name" label="型号" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ row.name || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="显存" width="100">
+        <el-table-column resizable label="显存" width="100" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
           </template>
         </el-table-column>
-        <el-table-column resizable prop="driver_version" label="驱动" width="130">
+        <el-table-column resizable prop="driver_version" label="驱动" width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.driver_version || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="pcie_id" label="PCIe" width="130">
+        <el-table-column resizable prop="pcie_id" label="PCIe" width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.pcie_id || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="SN" min-width="130">
+        <el-table-column resizable label="SN" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.serial_number || '-' }}</template>
         </el-table-column>
       </el-table>
@@ -201,13 +201,13 @@
             <DiffDetail :diff="row.diff" />
           </template>
         </el-table-column>
-        <el-table-column resizable prop="created_at" label="时间" min-width="170">
+        <el-table-column resizable prop="created_at" label="时间" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">{{ fmt(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column resizable label="变更内容" min-width="200">
+        <el-table-column resizable label="变更内容" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ digest(row) }}</template>
         </el-table-column>
-        <el-table-column resizable prop="source" label="来源" width="120">
+        <el-table-column resizable prop="source" label="来源" width="120" show-overflow-tooltip>
           <template #default="{ row }">{{ row.source || '-' }}</template>
         </el-table-column>
       </el-table>

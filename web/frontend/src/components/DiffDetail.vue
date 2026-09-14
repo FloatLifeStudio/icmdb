@@ -5,26 +5,26 @@
     >
       <h4 class="section-title">主机字段</h4>
       <el-table :data="diff.fields" border size="small">
-        <el-table-column prop="field" label="字段" min-width="140" />
-        <el-table-column label="旧值(库中)" min-width="170">
+        <el-table-column resizable prop="field" label="字段" min-width="140" />
+        <el-table-column resizable label="旧值(库中)" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">{{ row.old ?? '-' }}</template>
         </el-table-column>
-        <el-table-column label="新值(推送)" min-width="170">
+        <el-table-column resizable label="新值(推送)" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">{{ row.new ?? '-' }}</template>
         </el-table-column>
       </el-table>
 
       <h4 class="section-title">网卡</h4>
       <el-table :data="diff.nics" border size="small">
-        <el-table-column prop="name" label="网卡" width="110" />
-        <el-table-column label="类型" width="90">
+        <el-table-column resizable prop="name" label="网卡" width="110" />
+        <el-table-column resizable label="类型" width="90">
           <template #default="{ row }">
             <el-tag :type="kindTag[row.kind]" size="small">
               {{ kindLabel[row.kind] }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="变化" min-width="280">
+        <el-table-column resizable label="变化" min-width="280" show-overflow-tooltip>
           <template #default="{ row }">
             <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
             <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
@@ -35,15 +35,15 @@
       <template v-if="diff.memory?.length">
         <h4 class="section-title">内存</h4>
         <el-table :data="diff.memory" border size="small">
-          <el-table-column prop="slot" label="槽位" width="110" />
-          <el-table-column label="类型" width="90">
+          <el-table-column resizable prop="slot" label="槽位" width="110" />
+          <el-table-column resizable label="类型" width="90">
             <template #default="{ row }">
               <el-tag :type="kindTag[row.kind]" size="small">
                 {{ kindLabel[row.kind] }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="变化" min-width="280">
+          <el-table-column resizable label="变化" min-width="280" show-overflow-tooltip>
             <template #default="{ row }">
               <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
               <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
@@ -55,15 +55,15 @@
       <template v-if="diff.cpus?.length">
         <h4 class="section-title">CPU</h4>
         <el-table :data="diff.cpus" border size="small">
-          <el-table-column prop="slot" label="槽位" width="110" />
-          <el-table-column label="类型" width="90">
+          <el-table-column resizable prop="slot" label="槽位" width="110" />
+          <el-table-column resizable label="类型" width="90">
             <template #default="{ row }">
               <el-tag :type="kindTag[row.kind]" size="small">
                 {{ kindLabel[row.kind] }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="变化" min-width="280">
+          <el-table-column resizable label="变化" min-width="280" show-overflow-tooltip>
             <template #default="{ row }">
               <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
               <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
@@ -75,15 +75,15 @@
       <template v-if="diff.disks?.length">
         <h4 class="section-title">硬盘</h4>
         <el-table :data="diff.disks" border size="small">
-          <el-table-column prop="serial_number" label="SN" width="130" />
-          <el-table-column label="类型" width="90">
+          <el-table-column resizable prop="serial_number" label="SN" width="130" />
+          <el-table-column resizable label="类型" width="90">
             <template #default="{ row }">
               <el-tag :type="kindTag[row.kind]" size="small">
                 {{ kindLabel[row.kind] }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="变化" min-width="280">
+          <el-table-column resizable label="变化" min-width="280" show-overflow-tooltip>
             <template #default="{ row }">
               <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
               <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
@@ -95,15 +95,15 @@
       <template v-if="diff.psus?.length">
         <h4 class="section-title">电源</h4>
         <el-table :data="diff.psus" border size="small">
-          <el-table-column prop="serial_number" label="SN" width="130" />
-          <el-table-column label="类型" width="90">
+          <el-table-column resizable prop="serial_number" label="SN" width="130" />
+          <el-table-column resizable label="类型" width="90">
             <template #default="{ row }">
               <el-tag :type="kindTag[row.kind]" size="small">
                 {{ kindLabel[row.kind] }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="变化" min-width="280">
+          <el-table-column resizable label="变化" min-width="280" show-overflow-tooltip>
             <template #default="{ row }">
               <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
               <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
@@ -115,15 +115,15 @@
       <template v-if="diff.gpus?.length">
         <h4 class="section-title">GPU</h4>
         <el-table :data="diff.gpus" border size="small">
-          <el-table-column prop="uuid" label="UUID" width="130" />
-          <el-table-column label="类型" width="90">
+          <el-table-column resizable prop="uuid" label="UUID" width="130" />
+          <el-table-column resizable label="类型" width="90">
             <template #default="{ row }">
               <el-tag :type="kindTag[row.kind]" size="small">
                 {{ kindLabel[row.kind] }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="变化" min-width="280">
+          <el-table-column resizable label="变化" min-width="280" show-overflow-tooltip>
             <template #default="{ row }">
               <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
               <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
