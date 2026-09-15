@@ -26,13 +26,13 @@
         <el-card class="card">
           <template #header>主机字段差异(设备 #{{ pending.device_id }})</template>
           <el-table :data="pending.diff.fields" border>
-            <el-table-column resizable label="字段" min-width="140" show-overflow-tooltip>
+            <el-table-column resizable label="字段" :min-width="diffWidths.fields.field" show-overflow-tooltip>
               <template #default="{ row }">{{ fieldLabel(row.field) }}</template>
             </el-table-column>
-            <el-table-column resizable label="旧值(库中)" min-width="180" show-overflow-tooltip>
+            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.fields.old" show-overflow-tooltip>
               <template #default="{ row }">{{ row.old ?? '-' }}</template>
             </el-table-column>
-            <el-table-column resizable label="新值(推送)" min-width="180" show-overflow-tooltip>
+            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.fields.new" show-overflow-tooltip>
               <template #default="{ row }">{{ row.new ?? '-' }}</template>
             </el-table-column>
             <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
@@ -59,10 +59,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.nics.old" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(nicRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.nics.new" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(nicRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
@@ -89,10 +89,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.memory.old" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(memoryRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.memory.new" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(memoryRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
@@ -119,10 +119,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.cpus.old" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(cpuRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.cpus.new" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(cpuRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
@@ -149,10 +149,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.disks.old" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(diskRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.disks.new" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(diskRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
@@ -182,10 +182,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.psus.old" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(psuRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.psus.new" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(psuRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
@@ -215,10 +215,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column resizable label="旧值(库中)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.gpus.old" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(gpuRepr, row, 'old') }}</template>
             </el-table-column>
-            <el-table-column resizable label="新值(推送)" min-width="200" show-overflow-tooltip>
+            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.gpus.new" show-overflow-tooltip>
               <template #default="{ row }">{{ partContent(gpuRepr, row, 'new') }}</template>
             </el-table-column>
             <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
@@ -260,6 +260,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, TableInstance } from 'element-plus'
 import { api, PendingChange } from '../api'
+import { fitMinWidths, FitCol } from '../utils/fit'
 
 // 裁决提交成功后通知侧边栏气泡立即刷新
 const refreshPendingCount = inject<() => void>('refreshPendingCount', () => {})
@@ -388,6 +389,34 @@ const gpuNewLabel: Record<string, string> = {
   removed: '删除该 GPU',
   changed: '采用新值',
 }
+
+// 列宽自适应:旧值/新值列按最长内容算 min-width,默认刚好放下、完整显示
+type DiffEntry = {
+  kind: string
+  old: unknown
+  new: unknown
+  changes?: { field: string; old: unknown; new: unknown }[]
+}
+const diffWidths = computed(() => {
+  const d = pending.value?.diff
+  const valueCols = (reprFn: (o: Record<string, unknown>) => string): FitCol<DiffEntry>[] => [
+    { key: 'old', label: '旧值(库中)', text: (r) => partContent(reprFn, r, 'old') },
+    { key: 'new', label: '新值(推送)', text: (r) => partContent(reprFn, r, 'new') },
+  ]
+  return {
+    fields: fitMinWidths(d?.fields ?? [], [
+      { key: 'field', label: '字段' },
+      { key: 'old', label: '旧值(库中)' },
+      { key: 'new', label: '新值(推送)' },
+    ]),
+    nics: fitMinWidths(d?.nics ?? [], valueCols(nicRepr)),
+    memory: fitMinWidths(d?.memory ?? [], valueCols(memoryRepr)),
+    cpus: fitMinWidths(d?.cpus ?? [], valueCols(cpuRepr)),
+    disks: fitMinWidths(d?.disks ?? [], valueCols(diskRepr)),
+    psus: fitMinWidths(d?.psus ?? [], valueCols(psuRepr)),
+    gpus: fitMinWidths(d?.gpus ?? [], valueCols(gpuRepr)),
+  }
+})
 
 function memoryRepr(m: Record<string, unknown>): string {
   const parts: string[] = []

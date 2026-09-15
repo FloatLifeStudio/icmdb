@@ -93,25 +93,25 @@
     <el-card v-if="device && device.memory.length" class="card">
       <template #header>内存</template>
       <el-table :data="device.memory" border>
-        <el-table-column resizable prop="slot" label="槽位" width="110" show-overflow-tooltip/>
-        <el-table-column resizable prop="manufacturer" label="厂商" min-width="110" show-overflow-tooltip>
+        <el-table-column resizable prop="slot" label="槽位" :min-width="memoryWidths.slot" show-overflow-tooltip/>
+        <el-table-column resizable prop="manufacturer" label="厂商" :min-width="memoryWidths.manufacturer" show-overflow-tooltip>
           <template #default="{ row }">{{ row.manufacturer || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="part_number" label="型号" min-width="190" show-overflow-tooltip>
+        <el-table-column resizable prop="part_number" label="型号" :min-width="memoryWidths.part_number" show-overflow-tooltip>
           <template #default="{ row }">{{ row.part_number || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="type" label="代数" width="90" show-overflow-tooltip>
+        <el-table-column resizable prop="type" label="代数" :min-width="memoryWidths.type" show-overflow-tooltip>
           <template #default="{ row }">{{ row.type || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="容量" width="100" show-overflow-tooltip>
+        <el-table-column resizable label="容量" :min-width="memoryWidths.size" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
           </template>
         </el-table-column>
-        <el-table-column resizable label="频率" width="110" show-overflow-tooltip>
+        <el-table-column resizable label="频率" :min-width="memoryWidths.speed_mts" show-overflow-tooltip>
           <template #default="{ row }">{{ row.speed_mts ? row.speed_mts + 'MT/s' : '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="serial_number" label="SN" min-width="130" show-overflow-tooltip>
+        <el-table-column resizable prop="serial_number" label="SN" :min-width="memoryWidths.serial_number" show-overflow-tooltip>
           <template #default="{ row }">{{ row.serial_number || '-' }}</template>
         </el-table-column>
       </el-table>
@@ -120,68 +120,68 @@
     <el-card v-if="device && device.cpus.length" class="card">
       <template #header>CPU</template>
       <el-table :data="device.cpus" border>
-        <el-table-column resizable prop="slot" label="槽位" width="110" show-overflow-tooltip/>
-        <el-table-column resizable prop="model" label="型号" min-width="300" show-overflow-tooltip/>
+        <el-table-column resizable prop="slot" label="槽位" :min-width="cpuWidths.slot" show-overflow-tooltip/>
+        <el-table-column resizable prop="model" label="型号" :min-width="cpuWidths.model" show-overflow-tooltip/>
       </el-table>
     </el-card>
 
     <el-card v-if="device && device.disks.length" class="card">
       <template #header>硬盘</template>
       <el-table :data="device.disks" border>
-        <el-table-column resizable prop="type" label="类型" width="90" show-overflow-tooltip>
+        <el-table-column resizable prop="type" label="类型" :min-width="diskWidths.type" show-overflow-tooltip>
           <template #default="{ row }">{{ row.type || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="manufacturer" label="品牌" min-width="110" show-overflow-tooltip>
+        <el-table-column resizable prop="manufacturer" label="品牌" :min-width="diskWidths.manufacturer" show-overflow-tooltip>
           <template #default="{ row }">{{ row.manufacturer || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="model" label="型号" min-width="190" show-overflow-tooltip>
+        <el-table-column resizable prop="model" label="型号" :min-width="diskWidths.model" show-overflow-tooltip>
           <template #default="{ row }">{{ row.model || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="容量" width="110" show-overflow-tooltip>
+        <el-table-column resizable label="容量" :min-width="diskWidths.size" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
           </template>
         </el-table-column>
-        <el-table-column resizable prop="serial_number" label="SN" min-width="130" show-overflow-tooltip/>
+        <el-table-column resizable prop="serial_number" label="SN" :min-width="diskWidths.serial_number" show-overflow-tooltip/>
       </el-table>
     </el-card>
 
     <el-card v-if="device && device.psus.length" class="card">
       <template #header>电源</template>
       <el-table :data="device.psus" border>
-        <el-table-column resizable prop="manufacturer" label="品牌" min-width="110" show-overflow-tooltip>
+        <el-table-column resizable prop="manufacturer" label="品牌" :min-width="psuWidths.manufacturer" show-overflow-tooltip>
           <template #default="{ row }">{{ row.manufacturer || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="model" label="型号" min-width="190" show-overflow-tooltip>
+        <el-table-column resizable prop="model" label="型号" :min-width="psuWidths.model" show-overflow-tooltip>
           <template #default="{ row }">{{ row.model || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="最大功率" width="130" show-overflow-tooltip>
+        <el-table-column resizable label="最大功率" :min-width="psuWidths.max_power_w" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.max_power_w ? row.max_power_w + 'W' : '-' }}
           </template>
         </el-table-column>
-        <el-table-column resizable prop="serial_number" label="SN" min-width="130" show-overflow-tooltip/>
+        <el-table-column resizable prop="serial_number" label="SN" :min-width="psuWidths.serial_number" show-overflow-tooltip/>
       </el-table>
     </el-card>
 
     <el-card v-if="device && device.gpus.length" class="card">
       <template #header>GPU</template>
       <el-table :data="device.gpus" border>
-        <el-table-column resizable prop="name" label="型号" min-width="200" show-overflow-tooltip>
+        <el-table-column resizable prop="name" label="型号" :min-width="gpuWidths.name" show-overflow-tooltip>
           <template #default="{ row }">{{ row.name || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="显存" width="100" show-overflow-tooltip>
+        <el-table-column resizable label="显存" :min-width="gpuWidths.size" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.size ? row.size + (row.size_unit ?? '') : '-' }}
           </template>
         </el-table-column>
-        <el-table-column resizable prop="driver_version" label="驱动" width="130" show-overflow-tooltip>
+        <el-table-column resizable prop="driver_version" label="驱动" :min-width="gpuWidths.driver_version" show-overflow-tooltip>
           <template #default="{ row }">{{ row.driver_version || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="pcie_id" label="PCIe" width="130" show-overflow-tooltip>
+        <el-table-column resizable prop="pcie_id" label="PCIe" :min-width="gpuWidths.pcie_id" show-overflow-tooltip>
           <template #default="{ row }">{{ row.pcie_id || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable label="SN" min-width="130" show-overflow-tooltip>
+        <el-table-column resizable label="SN" :min-width="gpuWidths.serial_number" show-overflow-tooltip>
           <template #default="{ row }">{{ row.serial_number || '-' }}</template>
         </el-table-column>
       </el-table>
@@ -233,6 +233,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, TableInstance } from 'element-plus'
 import { api, DeviceOut, HistoryRow } from '../api'
 import DiffDetail from '../components/DiffDetail.vue'
+import { fitMinWidths } from '../utils/fit'
 
 const userRole = inject('userRole', ref('viewer'))
 const isAdmin = computed(() => userRole.value === 'admin')
@@ -246,6 +247,51 @@ const historyLoading = ref(false)
 const tagDialogVisible = ref(false)
 const tagInput = ref('')
 const historyTable = ref<TableInstance>()
+
+// 列宽自适应:按各列最长内容算 min-width,默认刚好放下、完整显示
+const memoryWidths = computed(() =>
+  fitMinWidths(device.value?.memory ?? [], [
+    { key: 'slot', label: '槽位' },
+    { key: 'manufacturer', label: '厂商' },
+    { key: 'part_number', label: '型号' },
+    { key: 'type', label: '代数' },
+    { key: 'size', label: '容量', text: (r) => (r.size ? `${r.size}${r.size_unit ?? ''}` : '-') },
+    { key: 'speed_mts', label: '频率', text: (r) => (r.speed_mts ? `${r.speed_mts}MT/s` : '-') },
+    { key: 'serial_number', label: 'SN' },
+  ])
+)
+const cpuWidths = computed(() =>
+  fitMinWidths(device.value?.cpus ?? [], [
+    { key: 'slot', label: '槽位' },
+    { key: 'model', label: '型号' },
+  ])
+)
+const diskWidths = computed(() =>
+  fitMinWidths(device.value?.disks ?? [], [
+    { key: 'type', label: '类型' },
+    { key: 'manufacturer', label: '品牌' },
+    { key: 'model', label: '型号' },
+    { key: 'size', label: '容量', text: (r) => (r.size ? `${r.size}${r.size_unit ?? ''}` : '-') },
+    { key: 'serial_number', label: 'SN' },
+  ])
+)
+const psuWidths = computed(() =>
+  fitMinWidths(device.value?.psus ?? [], [
+    { key: 'manufacturer', label: '品牌' },
+    { key: 'model', label: '型号' },
+    { key: 'max_power_w', label: '最大功率', text: (r) => (r.max_power_w ? `${r.max_power_w}W` : '-') },
+    { key: 'serial_number', label: 'SN' },
+  ])
+)
+const gpuWidths = computed(() =>
+  fitMinWidths(device.value?.gpus ?? [], [
+    { key: 'name', label: '型号' },
+    { key: 'size', label: '显存', text: (r) => (r.size ? `${r.size}${r.size_unit ?? ''}` : '-') },
+    { key: 'driver_version', label: '驱动' },
+    { key: 'pcie_id', label: 'PCIe' },
+    { key: 'serial_number', label: 'SN' },
+  ])
+)
 
 // 点击行任意位置展开/收起明细
 function toggleExpand(row: HistoryRow) {
