@@ -9,9 +9,9 @@ class Settings:
     def __init__(self) -> None:
         # SQLite 数据库文件路径
         self.db_path: str = os.getenv("CMDB_DB_PATH", "cmdb.db")
-        # 疑似下线阈值:超 N 天未推送标记为 suspected_offline
+        # 疑似下线阈值:超过 24 小时(N 天)未推送标记为 suspected_offline
         self.offline_threshold_days: int = int(
-            os.getenv("CMDB_OFFLINE_THRESHOLD_DAYS", "3")
+            os.getenv("CMDB_OFFLINE_THRESHOLD_DAYS", "1")
         )
         # 前端构建产物目录(FastAPI StaticFiles 托管)
         self.static_dir: str = os.getenv(

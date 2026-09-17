@@ -222,7 +222,7 @@ curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
 }
 ```
 
-`status` 动态计算:超阈值(默认 3 天,`CMDB_OFFLINE_THRESHOLD_DAYS` 可配)未推送
+`status` 动态计算:超阈值(默认 1 天即 24 小时,`CMDB_OFFLINE_THRESHOLD_DAYS` 可配)未推送
 标记 `suspected_offline`,数据不自动删。
 
 ### `GET /api/v1/devices/{id}` — 设备详情
