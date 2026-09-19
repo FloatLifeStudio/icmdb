@@ -117,7 +117,7 @@
               v-for="d in pending.diff.disks"
               :key="d.serial_number"
               :entry="d"
-              :identity="d.serial_number || '(未采集)'"
+              :identity="hwSummary(d, ['manufacturer', 'model', 'type'], 'serial_number', 'SN')"
               noun="硬盘"
               :model-value="d.serial_number ? diskChoices[d.serial_number] : undefined"
               @update:model-value="d.serial_number && (diskChoices[d.serial_number] = $event)"
@@ -133,7 +133,7 @@
               v-for="p in pending.diff.psus"
               :key="p.serial_number"
               :entry="p"
-              :identity="p.serial_number || '(未采集)'"
+              :identity="hwSummary(p, ['manufacturer', 'model'], 'serial_number', 'SN')"
               noun="电源"
               :model-value="p.serial_number ? psuChoices[p.serial_number] : undefined"
               @update:model-value="p.serial_number && (psuChoices[p.serial_number] = $event)"
@@ -149,7 +149,7 @@
               v-for="g in pending.diff.gpus"
               :key="g.uuid"
               :entry="g"
-              :identity="g.uuid || '(未采集)'"
+              :identity="hwSummary(g, ['name'], 'uuid', 'UUID')"
               noun="GPU"
               :model-value="g.uuid ? gpuChoices[g.uuid] : undefined"
               @update:model-value="g.uuid && (gpuChoices[g.uuid] = $event)"
@@ -242,6 +242,24 @@ const hasEntries = computed(() => {
         d.gpus?.length),
   )
 })
+
+// 条目标识的可读摘要:added 取新对象、removed/changed 取旧对象,
+// 用名称/厂商/型号拼出人类可读的条目名,SN/UUID 作附注(仅凭 UUID/SN 看不出是哪个硬件)
+function hwSummary(
+  entry: {
+    kind: string
+    old: Record<string, unknown> | null
+    new: Record<string, unknown> | null
+  },
+  names: string[],
+  key: string,
+  keyLabel: string,
+): string {
+  const o = (entry.kind === 'added' ? entry.new : entry.old) ?? {}
+  const parts = names.filter((n) => o[n]).map((n) => String(o[n]))
+  const id = o[key]
+  return [...parts, id ? `${keyLabel}:${id}` : ''].filter(Boolean).join(' · ') || '(未采集)'
+}
 
 function fmt(ts: string): string {
   // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区

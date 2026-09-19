@@ -97,7 +97,9 @@
       <template v-if="diff.disks?.length">
         <h4 class="section-title">硬盘</h4>
         <el-table :data="diff.disks" border size="small">
-          <el-table-column resizable prop="serial_number" label="SN" :min-width="diffWidths.disks.serial_number" show-overflow-tooltip/>
+          <el-table-column resizable label="SN" :min-width="diffWidths.disks.serial_number" show-overflow-tooltip>
+            <template #default="{ row }">{{ ident(row, ['manufacturer', 'model', 'type'], 'serial_number', 'SN') }}</template>
+          </el-table-column>
           <el-table-column resizable label="类型" width="90">
             <template #default="{ row }">
               <el-tag :type="kindTag[row.kind]" size="small">
@@ -123,7 +125,9 @@
       <template v-if="diff.psus?.length">
         <h4 class="section-title">电源</h4>
         <el-table :data="diff.psus" border size="small">
-          <el-table-column resizable prop="serial_number" label="SN" :min-width="diffWidths.psus.serial_number" show-overflow-tooltip/>
+          <el-table-column resizable label="SN" :min-width="diffWidths.psus.serial_number" show-overflow-tooltip>
+            <template #default="{ row }">{{ ident(row, ['manufacturer', 'model'], 'serial_number', 'SN') }}</template>
+          </el-table-column>
           <el-table-column resizable label="类型" width="90">
             <template #default="{ row }">
               <el-tag :type="kindTag[row.kind]" size="small">
@@ -149,7 +153,9 @@
       <template v-if="diff.gpus?.length">
         <h4 class="section-title">GPU</h4>
         <el-table :data="diff.gpus" border size="small">
-          <el-table-column resizable prop="uuid" label="UUID" :min-width="diffWidths.gpus.uuid" show-overflow-tooltip/>
+          <el-table-column resizable label="UUID" :min-width="diffWidths.gpus.uuid" show-overflow-tooltip>
+            <template #default="{ row }">{{ ident(row, ['name'], 'uuid', 'UUID') }}</template>
+          </el-table-column>
           <el-table-column resizable label="类型" width="90">
             <template #default="{ row }">
               <el-tag :type="kindTag[row.kind]" size="small">
@@ -235,6 +241,26 @@ const emptyHint: Record<string, string> = {
   added: '新增,无字段变化',
   removed: '库中多出,裁决 new 即删除',
   changed: '-',
+}
+
+// 条目标识的可读摘要:added 取新对象、removed/changed 取旧对象,
+// 名称/厂商/型号在前,SN/UUID 作附注(仅凭 UUID/SN 看不出是哪个硬件)
+function ident(
+  row: {
+    kind: string
+    uuid?: string
+    serial_number?: string
+    old: Record<string, unknown> | null
+    new: Record<string, unknown> | null
+  },
+  names: string[],
+  key: string,
+  keyLabel: string,
+): string {
+  const o = (row.kind === 'added' ? row.new : row.old) ?? {}
+  const parts = names.filter((n) => o[n]).map((n) => String(o[n]))
+  const id = (row as Record<string, unknown>)[key] ?? o[key]
+  return [...parts, id ? `${keyLabel}:${id}` : ''].filter(Boolean).join(' · ') || '-'
 }
 
 function changeRepr(c: { field: string; old: unknown; new: unknown }): string {
