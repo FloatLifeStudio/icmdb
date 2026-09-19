@@ -23,231 +23,145 @@
 
     <div class="detail">
       <template v-if="pending">
-        <el-card class="card">
-          <template #header>主机字段差异(设备 #{{ pending.device_id }})</template>
-          <el-table :data="pending.diff.fields" border>
-            <el-table-column resizable label="字段" :min-width="diffWidths.fields.field" show-overflow-tooltip>
-              <template #default="{ row }">{{ fieldLabel(row.field) }}</template>
-            </el-table-column>
-            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.fields.old" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.old ?? '-' }}</template>
-            </el-table-column>
-            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.fields.new" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.new ?? '-' }}</template>
-            </el-table-column>
-            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
-              <template #default="{ row }">
-                <el-radio-group v-model="fieldChoices[row.field]">
-                  <el-radio value="old">保留旧值</el-radio>
-                  <el-radio value="new">采用新值</el-radio>
-                </el-radio-group>
-              </template>
-            </el-table-column>
-          </el-table>
+        <!-- 摘要条:改动规模概览 + 提交按钮固定在顶部,不被内容推走 -->
+        <el-card v-if="hasEntries" class="card summary-card">
+          <div class="summary-bar">
+            <div class="summary-info">
+              <span class="dev">设备 #{{ pending.device_id }}</span>
+              <span class="counts">
+                <el-tag type="success" size="small">新增 {{ counts.added }}</el-tag>
+                <el-tag type="danger" size="small">候删 {{ counts.removed }}</el-tag>
+                <el-tag type="warning" size="small">变化 {{ counts.changed }}</el-tag>
+              </span>
+            </div>
+            <div v-if="isAdmin" class="summary-actions">
+              <el-button size="small" @click="keepAllOld">全部保留旧值</el-button>
+              <el-button type="primary" size="small" :loading="resolving" @click="submit">
+                提交裁决
+              </el-button>
+            </div>
+          </div>
         </el-card>
 
-        <el-card class="card" v-if="pending.diff.nics.length">
-          <template #header>网卡</template>
-          <el-table :data="pending.diff.nics" border>
-            <el-table-column resizable label="网卡" width="110">
-              <template #default="{ row }">{{ row.name }}</template>
-            </el-table-column>
-            <el-table-column resizable label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="kindTag[row.kind]" size="small">
-                  {{ kindLabel[row.kind] }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.nics.old" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(nicRepr, row, 'old') }}</template>
-            </el-table-column>
-            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.nics.new" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(nicRepr, row, 'new') }}</template>
-            </el-table-column>
-            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
-              <template #default="{ row }">
-                <el-radio-group v-model="nicChoices[row.name]" v-if="row.name">
-                  <el-radio value="old">{{ kindOldLabel[row.kind] }}</el-radio>
-                  <el-radio value="new">{{ kindNewLabel[row.kind] }}</el-radio>
+        <el-collapse v-if="hasEntries" v-model="openSections" class="sections">
+          <el-collapse-item v-if="pending.diff.fields.length" name="fields">
+            <template #title>
+              <span class="sec-title">主机字段 ({{ pending.diff.fields.length }})</span>
+            </template>
+            <div v-for="f in pending.diff.fields" :key="f.field" class="field-row">
+              <span class="fname">{{ fieldLabel(f.field) }}</span>
+              <span class="old-val mono">{{ fmtValue(f.field, f.old) }}</span>
+              <span class="arrow">→</span>
+              <span class="new-val mono">{{ fmtValue(f.field, f.new) }}</span>
+              <span v-if="isAdmin" class="choice">
+                <el-radio-group v-model="fieldChoices[f.field]" size="small">
+                  <el-radio-button value="old">保留旧值</el-radio-button>
+                  <el-radio-button value="new">采用新值</el-radio-button>
                 </el-radio-group>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+              </span>
+            </div>
+          </el-collapse-item>
 
-        <el-card class="card" v-if="pending.diff.memory?.length">
-          <template #header>内存</template>
-          <el-table :data="pending.diff.memory" border>
-            <el-table-column resizable label="槽位" width="120">
-              <template #default="{ row }">{{ row.slot }}</template>
-            </el-table-column>
-            <el-table-column resizable label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="kindTag[row.kind]" size="small">
-                  {{ kindLabel[row.kind] }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.memory.old" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(memoryRepr, row, 'old') }}</template>
-            </el-table-column>
-            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.memory.new" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(memoryRepr, row, 'new') }}</template>
-            </el-table-column>
-            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
-              <template #default="{ row }">
-                <el-radio-group v-model="memoryChoices[row.slot!]" v-if="row.slot">
-                  <el-radio value="old">{{ memoryOldLabel[row.kind] }}</el-radio>
-                  <el-radio value="new">{{ memoryNewLabel[row.kind] }}</el-radio>
-                </el-radio-group>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+          <el-collapse-item v-if="pending.diff.nics.length" name="nics">
+            <template #title>
+              <span class="sec-title">网卡 ({{ pending.diff.nics.length }})</span>
+            </template>
+            <DiffEntry
+              v-for="n in pending.diff.nics"
+              :key="n.name"
+              :entry="n"
+              :identity="n.name || '(未命名)'"
+              noun="网卡"
+              v-model="nicChoices[n.name]"
+              :is-admin="isAdmin"
+            />
+          </el-collapse-item>
 
-        <el-card class="card" v-if="pending.diff.cpus?.length">
-          <template #header>CPU</template>
-          <el-table :data="pending.diff.cpus" border>
-            <el-table-column resizable label="槽位" width="120">
-              <template #default="{ row }">{{ row.slot }}</template>
-            </el-table-column>
-            <el-table-column resizable label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="kindTag[row.kind]" size="small">
-                  {{ kindLabel[row.kind] }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.cpus.old" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(cpuRepr, row, 'old') }}</template>
-            </el-table-column>
-            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.cpus.new" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(cpuRepr, row, 'new') }}</template>
-            </el-table-column>
-            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
-              <template #default="{ row }">
-                <el-radio-group v-model="cpuChoices[row.slot!]" v-if="row.slot">
-                  <el-radio value="old">{{ cpuOldLabel[row.kind] }}</el-radio>
-                  <el-radio value="new">{{ cpuNewLabel[row.kind] }}</el-radio>
-                </el-radio-group>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+          <el-collapse-item v-if="pending.diff.memory?.length" name="memory">
+            <template #title>
+              <span class="sec-title">内存 ({{ pending.diff.memory.length }})</span>
+            </template>
+            <DiffEntry
+              v-for="m in pending.diff.memory"
+              :key="m.slot"
+              :entry="m"
+              :identity="m.slot || '(未采集)'"
+              noun="内存"
+              :model-value="m.slot ? memoryChoices[m.slot] : undefined"
+              @update:model-value="m.slot && (memoryChoices[m.slot] = $event)"
+              :is-admin="isAdmin"
+            />
+          </el-collapse-item>
 
-        <el-card class="card" v-if="pending.diff.disks?.length">
-          <template #header>硬盘</template>
-          <el-table :data="pending.diff.disks" border>
-            <el-table-column resizable label="SN" width="130">
-              <template #default="{ row }">{{ row.serial_number }}</template>
-            </el-table-column>
-            <el-table-column resizable label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="kindTag[row.kind]" size="small">
-                  {{ kindLabel[row.kind] }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.disks.old" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(diskRepr, row, 'old') }}</template>
-            </el-table-column>
-            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.disks.new" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(diskRepr, row, 'new') }}</template>
-            </el-table-column>
-            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
-              <template #default="{ row }">
-                <el-radio-group
-                  v-model="diskChoices[row.serial_number!]"
-                  v-if="row.serial_number"
-                >
-                  <el-radio value="old">{{ diskOldLabel[row.kind] }}</el-radio>
-                  <el-radio value="new">{{ diskNewLabel[row.kind] }}</el-radio>
-                </el-radio-group>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+          <el-collapse-item v-if="pending.diff.cpus?.length" name="cpus">
+            <template #title>
+              <span class="sec-title">CPU ({{ pending.diff.cpus.length }})</span>
+            </template>
+            <DiffEntry
+              v-for="c in pending.diff.cpus"
+              :key="c.slot"
+              :entry="c"
+              :identity="c.slot || '(未采集)'"
+              noun="CPU"
+              :model-value="c.slot ? cpuChoices[c.slot] : undefined"
+              @update:model-value="c.slot && (cpuChoices[c.slot] = $event)"
+              :is-admin="isAdmin"
+            />
+          </el-collapse-item>
 
-        <el-card class="card" v-if="pending.diff.psus?.length">
-          <template #header>电源</template>
-          <el-table :data="pending.diff.psus" border>
-            <el-table-column resizable label="SN" width="130">
-              <template #default="{ row }">{{ row.serial_number }}</template>
-            </el-table-column>
-            <el-table-column resizable label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="kindTag[row.kind]" size="small">
-                  {{ kindLabel[row.kind] }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.psus.old" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(psuRepr, row, 'old') }}</template>
-            </el-table-column>
-            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.psus.new" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(psuRepr, row, 'new') }}</template>
-            </el-table-column>
-            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
-              <template #default="{ row }">
-                <el-radio-group
-                  v-model="psuChoices[row.serial_number!]"
-                  v-if="row.serial_number"
-                >
-                  <el-radio value="old">{{ psuOldLabel[row.kind] }}</el-radio>
-                  <el-radio value="new">{{ psuNewLabel[row.kind] }}</el-radio>
-                </el-radio-group>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+          <el-collapse-item v-if="pending.diff.disks?.length" name="disks">
+            <template #title>
+              <span class="sec-title">硬盘 ({{ pending.diff.disks.length }})</span>
+            </template>
+            <DiffEntry
+              v-for="d in pending.diff.disks"
+              :key="d.serial_number"
+              :entry="d"
+              :identity="d.serial_number || '(未采集)'"
+              noun="硬盘"
+              :model-value="d.serial_number ? diskChoices[d.serial_number] : undefined"
+              @update:model-value="d.serial_number && (diskChoices[d.serial_number] = $event)"
+              :is-admin="isAdmin"
+            />
+          </el-collapse-item>
 
-        <el-card class="card" v-if="pending.diff.gpus?.length">
-          <template #header>GPU</template>
-          <el-table :data="pending.diff.gpus" border>
-            <el-table-column resizable label="UUID" width="130">
-              <template #default="{ row }">{{ row.uuid }}</template>
-            </el-table-column>
-            <el-table-column resizable label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="kindTag[row.kind]" size="small">
-                  {{ kindLabel[row.kind] }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.gpus.old" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(gpuRepr, row, 'old') }}</template>
-            </el-table-column>
-            <el-table-column resizable label="新值(推送)" :min-width="diffWidths.gpus.new" show-overflow-tooltip>
-              <template #default="{ row }">{{ partContent(gpuRepr, row, 'new') }}</template>
-            </el-table-column>
-            <el-table-column resizable v-if="isAdmin" label="裁决" width="220">
-              <template #default="{ row }">
-                <el-radio-group v-model="gpuChoices[row.uuid!]" v-if="row.uuid">
-                  <el-radio value="old">{{ gpuOldLabel[row.kind] }}</el-radio>
-                  <el-radio value="new">{{ gpuNewLabel[row.kind] }}</el-radio>
-                </el-radio-group>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+          <el-collapse-item v-if="pending.diff.psus?.length" name="psus">
+            <template #title>
+              <span class="sec-title">电源 ({{ pending.diff.psus.length }})</span>
+            </template>
+            <DiffEntry
+              v-for="p in pending.diff.psus"
+              :key="p.serial_number"
+              :entry="p"
+              :identity="p.serial_number || '(未采集)'"
+              noun="电源"
+              :model-value="p.serial_number ? psuChoices[p.serial_number] : undefined"
+              @update:model-value="p.serial_number && (psuChoices[p.serial_number] = $event)"
+              :is-admin="isAdmin"
+            />
+          </el-collapse-item>
 
-        <div
-          class="actions"
-          v-if="isAdmin && hasEntries"
-        >
-          <el-button type="primary" :loading="resolving" @click="submit">
-            提交裁决
-          </el-button>
-          <el-button @click="keepAllOld">全部保留旧值</el-button>
-        </div>
-        <p class="readonly-hint" v-else-if="hasEntries">
+          <el-collapse-item v-if="pending.diff.gpus?.length" name="gpus">
+            <template #title>
+              <span class="sec-title">GPU ({{ pending.diff.gpus.length }})</span>
+            </template>
+            <DiffEntry
+              v-for="g in pending.diff.gpus"
+              :key="g.uuid"
+              :entry="g"
+              :identity="g.uuid || '(未采集)'"
+              noun="GPU"
+              :model-value="g.uuid ? gpuChoices[g.uuid] : undefined"
+              @update:model-value="g.uuid && (gpuChoices[g.uuid] = $event)"
+              :is-admin="isAdmin"
+            />
+          </el-collapse-item>
+        </el-collapse>
+
+        <p class="readonly-hint" v-if="isAdmin && !hasEntries">该记录无差异条目</p>
+        <p class="readonly-hint" v-else-if="!isAdmin && hasEntries">
           当前账号为只读权限,仅可查看差异;如需裁决请联系管理员。
         </p>
-        <el-empty
-          v-else
-          description="该记录无差异条目"
-        />
       </template>
       <el-card v-else class="card">
         <el-empty description="从左侧选择待裁决记录" />
@@ -260,25 +174,13 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, TableInstance } from 'element-plus'
 import { api, PendingChange } from '../api'
-import { fitMinWidths, FitCol } from '../utils/fit'
+import { fieldLabel, fmtValue } from '../utils/diff'
+import DiffEntry from '../components/DiffEntry.vue'
 
 // 裁决提交成功后通知侧边栏气泡立即刷新
 const refreshPendingCount = inject<() => void>('refreshPendingCount', () => {})
 const userRole = inject('userRole', ref('viewer'))
 const isAdmin = computed(() => userRole.value === 'admin')
-const hasEntries = computed(() => {
-  const d = pending.value?.diff
-  return Boolean(
-    d &&
-      (d.fields.length ||
-        d.nics.length ||
-        d.memory?.length ||
-        d.cpus?.length ||
-        d.disks?.length ||
-        d.psus?.length ||
-        d.gpus?.length),
-  )
-})
 
 const pendings = ref<PendingChange[]>([])
 const pending = ref<PendingChange | null>(null)
@@ -305,195 +207,46 @@ onMounted(() => {
 })
 onBeforeUnmount(() => window.removeEventListener('resize', onResize))
 
-const kindLabel: Record<string, string> = {
-  added: '新增',
-  removed: '候删',
-  changed: '有变化',
-}
+// 区块折叠状态:默认全部展开
+const openSections = ref<string[]>(['fields', 'nics', 'memory', 'cpus', 'disks', 'psus', 'gpus'])
 
-// 主机字段路径 -> 人类可读名称
-const fieldLabels: Record<string, string> = {
-  hostname: '主机名',
-  serial_number: '序列号',
-  mgmt_mac: '管理 MAC',
-  mgmt_ip: '管理 IP',
-  mgmt_prefix_length: '子网前缀',
-  mac: 'MAC',
-  ips: 'IP 列表',
-}
-function fieldLabel(f: string): string {
-  return fieldLabels[f] ?? f
-}
-const kindTag: Record<string, string> = {
-  added: 'success',
-  removed: 'danger',
-  changed: 'warning',
-}
-const kindOldLabel: Record<string, string> = {
-  added: '丢弃(不新增)',
-  removed: '保留(不删除)',
-  changed: '保留旧值',
-}
-const kindNewLabel: Record<string, string> = {
-  added: '新增该网卡',
-  removed: '删除该网卡',
-  changed: '采用新值',
-}
-const memoryOldLabel: Record<string, string> = {
-  added: '丢弃(不新增)',
-  removed: '保留(不删除)',
-  changed: '保留旧值',
-}
-const memoryNewLabel: Record<string, string> = {
-  added: '新增该内存',
-  removed: '删除该内存',
-  changed: '采用新值',
-}
-const cpuOldLabel: Record<string, string> = {
-  added: '丢弃(不新增)',
-  removed: '保留(不删除)',
-  changed: '保留旧值',
-}
-const cpuNewLabel: Record<string, string> = {
-  added: '新增该 CPU',
-  removed: '删除该 CPU',
-  changed: '采用新值',
-}
-const diskOldLabel: Record<string, string> = {
-  added: '丢弃(不新增)',
-  removed: '保留(不删除)',
-  changed: '保留旧值',
-}
-const diskNewLabel: Record<string, string> = {
-  added: '新增该硬盘',
-  removed: '删除该硬盘',
-  changed: '采用新值',
-}
-const psuOldLabel: Record<string, string> = {
-  added: '丢弃(不新增)',
-  removed: '保留(不删除)',
-  changed: '保留旧值',
-}
-const psuNewLabel: Record<string, string> = {
-  added: '新增该电源',
-  removed: '删除该电源',
-  changed: '采用新值',
-}
-const gpuOldLabel: Record<string, string> = {
-  added: '丢弃(不新增)',
-  removed: '保留(不删除)',
-  changed: '保留旧值',
-}
-const gpuNewLabel: Record<string, string> = {
-  added: '新增该 GPU',
-  removed: '删除该 GPU',
-  changed: '采用新值',
-}
-
-// 列宽自适应:旧值/新值列按最长内容算 min-width,默认刚好放下、完整显示
-type DiffEntry = {
-  kind: string
-  old: unknown
-  new: unknown
-  changes?: { field: string; old: unknown; new: unknown }[]
-}
-const diffWidths = computed(() => {
+// 改动规模概览:全部分类计数
+const counts = computed(() => {
   const d = pending.value?.diff
-  const valueCols = (reprFn: (o: Record<string, unknown>) => string): FitCol<DiffEntry>[] => [
-    { key: 'old', label: '旧值(库中)', text: (r) => partContent(reprFn, r, 'old') },
-    { key: 'new', label: '新值(推送)', text: (r) => partContent(reprFn, r, 'new') },
+  const list = [
+    ...(d?.fields ?? []).map(() => 'changed'),
+    ...(d?.nics ?? []).map((n) => n.kind),
+    ...(d?.memory ?? []).map((m) => m.kind),
+    ...(d?.cpus ?? []).map((c) => c.kind),
+    ...(d?.disks ?? []).map((k) => k.kind),
+    ...(d?.psus ?? []).map((k) => k.kind),
+    ...(d?.gpus ?? []).map((k) => k.kind),
   ]
   return {
-    fields: fitMinWidths(d?.fields ?? [], [
-      { key: 'field', label: '字段' },
-      { key: 'old', label: '旧值(库中)' },
-      { key: 'new', label: '新值(推送)' },
-    ]),
-    nics: fitMinWidths(d?.nics ?? [], valueCols(nicRepr)),
-    memory: fitMinWidths(d?.memory ?? [], valueCols(memoryRepr)),
-    cpus: fitMinWidths(d?.cpus ?? [], valueCols(cpuRepr)),
-    disks: fitMinWidths(d?.disks ?? [], valueCols(diskRepr)),
-    psus: fitMinWidths(d?.psus ?? [], valueCols(psuRepr)),
-    gpus: fitMinWidths(d?.gpus ?? [], valueCols(gpuRepr)),
+    added: list.filter((k) => k === 'added').length,
+    removed: list.filter((k) => k === 'removed').length,
+    changed: list.filter((k) => k === 'changed').length,
   }
 })
 
-function memoryRepr(m: Record<string, unknown>): string {
-  const parts: string[] = []
-  if (m.manufacturer) parts.push(String(m.manufacturer))
-  if (m.part_number) parts.push(String(m.part_number))
-  if (m.type) parts.push(String(m.type))
-  if (m.size) parts.push(`${m.size}${m.size_unit ?? ''}`)
-  if (m.speed_mts) parts.push(`${m.speed_mts}MT/s`)
-  if (m.serial_number) parts.push(`SN:${m.serial_number}`)
-  return parts.length ? parts.join(' ') : '-'
-}
-
-function gpuRepr(g: Record<string, unknown>): string {
-  const parts: string[] = []
-  if (g.name) parts.push(String(g.name))
-  if (g.size) parts.push(`${g.size}${g.size_unit ?? ''}`)
-  if (g.driver_version) parts.push(`driver:${g.driver_version}`)
-  if (g.pcie_id) parts.push(`${g.pcie_id}`)
-  if (g.serial_number) parts.push(`SN:${g.serial_number}`)
-  return parts.length ? parts.join(' ') : '-'
-}
-
-function diskRepr(d: Record<string, unknown>): string {
-  const parts: string[] = []
-  if (d.type) parts.push(String(d.type))
-  if (d.manufacturer) parts.push(String(d.manufacturer))
-  if (d.model) parts.push(String(d.model))
-  if (d.size) parts.push(`${d.size}${d.size_unit ?? ''}`)
-  if (d.serial_number) parts.push(`SN:${d.serial_number}`)
-  return parts.length ? parts.join(' ') : '-'
-}
-
-function psuRepr(p: Record<string, unknown>): string {
-  const parts: string[] = []
-  if (p.manufacturer) parts.push(String(p.manufacturer))
-  if (p.model) parts.push(String(p.model))
-  if (p.max_power_w) parts.push(`${p.max_power_w}W`)
-  if (p.serial_number) parts.push(`SN:${p.serial_number}`)
-  return parts.length ? parts.join(' ') : '-'
-}
-
-function cpuRepr(c: Record<string, unknown>): string {
-  return String(c.model ?? '-')
-}
-
-// 旧值/新值两列对比:added 的旧值与 removed 的新值不存在,显示 -
-function partContent(
-  reprFn: (o: Record<string, unknown>) => string,
-  entry: {
-    kind: string
-    old: unknown
-    new: unknown
-    changes?: { field: string; old: unknown; new: unknown }[]
-  },
-  which: 'old' | 'new',
-): string {
-  if (which === 'old' && entry.kind === 'added') return '-'
-  if (which === 'new' && entry.kind === 'removed') return '-'
-  const obj = (which === 'old' ? entry.old : entry.new) as Record<string, unknown> | null
-  if (obj) return reprFn(obj)
-  // 已存 diff 的 changed 条目没有整体 old/new,从逐字段 changes 回溯
-  const built: Record<string, unknown> = {}
-  for (const c of entry.changes ?? []) built[c.field] = which === 'old' ? c.old : c.new
-  return reprFn(built)
-}
+const hasEntries = computed(() => {
+  const d = pending.value?.diff
+  return Boolean(
+    d &&
+      (d.fields.length ||
+        d.nics.length ||
+        d.memory?.length ||
+        d.cpus?.length ||
+        d.disks?.length ||
+        d.psus?.length ||
+        d.gpus?.length),
+  )
+})
 
 function fmt(ts: string): string {
   // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
   const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z'
   return new Date(utc).toLocaleString()
-}
-
-function nicRepr(nic: Record<string, unknown>): string {
-  const mac = nic.mac ? `MAC ${nic.mac}` : '无 MAC'
-  const ips = (nic.ips as { ip: string; prefix_length: number | null }[]) || []
-  const ipStr = ips.map((i) => i.ip + (i.prefix_length ? '/' + i.prefix_length : ''))
-  return `${nic.name}(${mac}),IP: ${ipStr.length ? ipStr.join(', ') : '无'}`
 }
 
 async function load() {
@@ -520,7 +273,7 @@ function selectPending(row: PendingChange | null) {
   gpuChoices.value = {}
   if (row) {
     for (const f of row.diff.fields) fieldChoices.value[f.field] = 'new'
-    for (const n of row.diff.nics) nicChoices.value[n.name] = 'new'
+    for (const n of row.diff.nics) if (n.name) nicChoices.value[n.name] = 'new'
     for (const m of row.diff.memory ?? [])
       if (m.slot) memoryChoices.value[m.slot] = 'new'
     for (const c of row.diff.cpus ?? []) if (c.slot) cpuChoices.value[c.slot] = 'new'
@@ -537,7 +290,7 @@ function selectPending(row: PendingChange | null) {
 function keepAllOld() {
   if (!pending.value) return
   for (const f of pending.value.diff.fields) fieldChoices.value[f.field] = 'old'
-  for (const n of pending.value.diff.nics) nicChoices.value[n.name] = 'old'
+  for (const n of pending.value.diff.nics) if (n.name) nicChoices.value[n.name] = 'old'
   for (const m of pending.value.diff.memory ?? [])
     if (m.slot) memoryChoices.value[m.slot] = 'old'
   for (const c of pending.value.diff.cpus ?? []) if (c.slot) cpuChoices.value[c.slot] = 'old'
@@ -603,11 +356,71 @@ async function submit() {
 .card {
   margin-bottom: 16px;
 }
-.kind-tag {
-  margin-left: 8px;
+.summary-card :deep(.el-card__body) {
+  padding: 12px 16px;
 }
-.actions {
-  margin-top: 4px;
+.summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.summary-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dev {
+  font-weight: bold;
+  font-size: 15px;
+}
+.counts {
+  display: inline-flex;
+  gap: 6px;
+}
+.summary-actions {
+  display: flex;
+  gap: 8px;
+}
+.sections :deep(.el-collapse-item__header) {
+  font-weight: bold;
+}
+.field-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.fname {
+  flex-shrink: 0;
+  width: 96px;
+  color: var(--el-text-color-secondary);
+  text-align: right;
+}
+.mono {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+.old-val {
+  color: var(--el-color-danger);
+  background: #fef0f0;
+  text-decoration: line-through;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.new-val {
+  color: var(--el-color-success);
+  background: #f0f9eb;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.arrow {
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+}
+.choice {
+  margin-left: auto;
 }
 .readonly-hint {
   margin: 8px 0 0;

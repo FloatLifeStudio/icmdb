@@ -7,10 +7,14 @@
       <el-table :data="diff.fields" border size="small">
         <el-table-column resizable prop="field" label="字段" :min-width="diffWidths.fields.field" show-overflow-tooltip/>
         <el-table-column resizable label="旧值(库中)" :min-width="diffWidths.fields.old" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.old ?? '-' }}</template>
+          <template #default="{ row }">
+            <span class="old-val mono">{{ fmtValue(row.field, row.old) }}</span>
+          </template>
         </el-table-column>
         <el-table-column resizable label="新值(推送)" :min-width="diffWidths.fields.new" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.new ?? '-' }}</template>
+          <template #default="{ row }">
+            <span class="new-val mono">{{ fmtValue(row.field, row.new) }}</span>
+          </template>
         </el-table-column>
       </el-table>
 
@@ -26,8 +30,14 @@
         </el-table-column>
         <el-table-column resizable label="变化" :min-width="diffWidths.nics.changes" show-overflow-tooltip>
           <template #default="{ row }">
-            <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
-            <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+            <div v-for="(c, i) in row.changes" :key="i" class="change-line mono">
+              <span class="old-val">{{ fmtValue(c.field, c.old) }}</span>
+              <span class="arrow">→</span>
+              <span class="new-val">{{ fmtValue(c.field, c.new) }}</span>
+            </div>
+            <span v-if="!row.changes.length" :class="row.kind === 'added' ? 'hint-added' : 'hint-removed'">
+              {{ emptyHint[row.kind] }}
+            </span>
           </template>
         </el-table-column>
       </el-table>
@@ -45,8 +55,14 @@
           </el-table-column>
           <el-table-column resizable label="变化" :min-width="diffWidths.memory.changes" show-overflow-tooltip>
             <template #default="{ row }">
-              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
-              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+              <div v-for="(c, i) in row.changes" :key="i" class="change-line mono">
+                <span class="old-val">{{ fmtValue(c.field, c.old) }}</span>
+                <span class="arrow">→</span>
+                <span class="new-val">{{ fmtValue(c.field, c.new) }}</span>
+              </div>
+              <span v-if="!row.changes.length" :class="row.kind === 'added' ? 'hint-added' : 'hint-removed'">
+                {{ emptyHint[row.kind] }}
+              </span>
             </template>
           </el-table-column>
         </el-table>
@@ -65,8 +81,14 @@
           </el-table-column>
           <el-table-column resizable label="变化" :min-width="diffWidths.cpus.changes" show-overflow-tooltip>
             <template #default="{ row }">
-              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
-              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+              <div v-for="(c, i) in row.changes" :key="i" class="change-line mono">
+                <span class="old-val">{{ fmtValue(c.field, c.old) }}</span>
+                <span class="arrow">→</span>
+                <span class="new-val">{{ fmtValue(c.field, c.new) }}</span>
+              </div>
+              <span v-if="!row.changes.length" :class="row.kind === 'added' ? 'hint-added' : 'hint-removed'">
+                {{ emptyHint[row.kind] }}
+              </span>
             </template>
           </el-table-column>
         </el-table>
@@ -85,8 +107,14 @@
           </el-table-column>
           <el-table-column resizable label="变化" :min-width="diffWidths.disks.changes" show-overflow-tooltip>
             <template #default="{ row }">
-              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
-              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+              <div v-for="(c, i) in row.changes" :key="i" class="change-line mono">
+                <span class="old-val">{{ fmtValue(c.field, c.old) }}</span>
+                <span class="arrow">→</span>
+                <span class="new-val">{{ fmtValue(c.field, c.new) }}</span>
+              </div>
+              <span v-if="!row.changes.length" :class="row.kind === 'added' ? 'hint-added' : 'hint-removed'">
+                {{ emptyHint[row.kind] }}
+              </span>
             </template>
           </el-table-column>
         </el-table>
@@ -105,8 +133,14 @@
           </el-table-column>
           <el-table-column resizable label="变化" :min-width="diffWidths.psus.changes" show-overflow-tooltip>
             <template #default="{ row }">
-              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
-              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+              <div v-for="(c, i) in row.changes" :key="i" class="change-line mono">
+                <span class="old-val">{{ fmtValue(c.field, c.old) }}</span>
+                <span class="arrow">→</span>
+                <span class="new-val">{{ fmtValue(c.field, c.new) }}</span>
+              </div>
+              <span v-if="!row.changes.length" :class="row.kind === 'added' ? 'hint-added' : 'hint-removed'">
+                {{ emptyHint[row.kind] }}
+              </span>
             </template>
           </el-table-column>
         </el-table>
@@ -125,8 +159,14 @@
           </el-table-column>
           <el-table-column resizable label="变化" :min-width="diffWidths.gpus.changes" show-overflow-tooltip>
             <template #default="{ row }">
-              <div v-for="(c, i) in row.changes" :key="i">{{ changeRepr(c) }}</div>
-              <span v-if="!row.changes.length">{{ emptyHint[row.kind] }}</span>
+              <div v-for="(c, i) in row.changes" :key="i" class="change-line mono">
+                <span class="old-val">{{ fmtValue(c.field, c.old) }}</span>
+                <span class="arrow">→</span>
+                <span class="new-val">{{ fmtValue(c.field, c.new) }}</span>
+              </div>
+              <span v-if="!row.changes.length" :class="row.kind === 'added' ? 'hint-added' : 'hint-removed'">
+                {{ emptyHint[row.kind] }}
+              </span>
             </template>
           </el-table-column>
         </el-table>
@@ -140,6 +180,7 @@
 import { computed } from 'vue'
 import { PendingChange } from '../api'
 import { fitMinWidths, longestLine, FitCol } from '../utils/fit'
+import { fieldLabel, fmtValue } from '../utils/diff'
 
 const props = defineProps<{
   diff: PendingChange['diff'] | null
@@ -197,12 +238,7 @@ const emptyHint: Record<string, string> = {
 }
 
 function changeRepr(c: { field: string; old: unknown; new: unknown }): string {
-  if (c.field === 'ips') {
-    const ips = (v: unknown) =>
-      ((v as { ip: string }[]) || []).map((i) => i.ip).join(', ') || '无'
-    return `${c.field}: ${ips(c.old)} -> ${ips(c.new)}`
-  }
-  return `${c.field}: ${c.old ?? '-'} -> ${c.new ?? '-'}`
+  return `${fieldLabel(c.field)}: ${fmtValue(c.field, c.old)} -> ${fmtValue(c.field, c.new)}`
 }
 </script>
 
@@ -212,5 +248,35 @@ function changeRepr(c: { field: string; old: unknown; new: unknown }): string {
 }
 .section-title {
   margin: 8px 0;
+}
+.change-line {
+  padding: 1px 0;
+  font-size: 12px;
+}
+.mono {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+.old-val {
+  color: var(--el-color-danger);
+  background: #fef0f0;
+  text-decoration: line-through;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.new-val {
+  color: var(--el-color-success);
+  background: #f0f9eb;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.arrow {
+  color: var(--el-text-color-secondary);
+  margin: 0 2px;
+}
+.hint-added {
+  color: var(--el-color-success);
+}
+.hint-removed {
+  color: var(--el-color-danger);
 }
 </style>
