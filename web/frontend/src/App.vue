@@ -158,6 +158,13 @@ provide('userRole', role)
 .menu {
   border-right: none;
 }
+/* Fixed-width icon box so every menu label starts at the same x (icon glyphs differ in width) */
+.menu :deep(.el-menu-item .el-icon) {
+  width: 16px;
+  font-size: 16px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
 .menu-item-label {
   flex: 1;
 }
