@@ -566,11 +566,10 @@ async function submit() {
       psu_choices: psuChoices.value,
       gpu_choices: gpuChoices.value,
     })
-    ElMessage.success(
-      res.applied.length
-        ? `裁决生效:${res.applied.join('; ')}`
-        : '裁决已提交(保留现状,无实际改动)'
-    )
+    ElMessage.success('裁决生效')
+    if (res.applied.length) {
+      console.info('applied:', res.applied.join('; '))
+    }
     await load()
     refreshPendingCount()
     // 自动切换到下一条:同一位置(即原下一条);裁决的是最后一条则回到列表开头
