@@ -2,7 +2,7 @@
   <div class="diff-entry" :class="`is-${entry.kind}`">
     <div class="entry-head">
       <el-tag :type="kindTag[entry.kind]" size="small">{{ kindLabel[entry.kind] }}</el-tag>
-      <span class="identity mono">{{ identity }}</span>
+      <span class="identity mono">{{ headText }}</span>
       <el-radio-group
         v-if="isAdmin && modelValue"
         size="small"
@@ -14,11 +14,8 @@
       </el-radio-group>
     </div>
     <div class="entry-body">
-      <!-- changed: identity context (unchanged fields, to confirm it is the same hardware) + red/green diff of changed fields -->
+      <!-- changed: red/green diff of the changed fields; identity + unchanged fields are in the head line -->
       <template v-if="entry.kind === 'changed'">
-        <div v-if="contextRows.length" class="context-row">
-          <span class="context-text">{{ contextRows.map((r) => r.value).join(' · ') }}</span>
-        </div>
         <div v-for="c in entry.changes ?? []" :key="c.field" class="change-row">
           <span class="fname">{{ fieldLabel(c.field) }}</span>
           <span class="old-val mono">{{ fmtValue(c.field, c.old) }}</span>
@@ -91,13 +88,19 @@ const rows = computed(() =>
 )
 
 // Identity context of a changed entry: unchanged fields from the old object (SN/manufacturer/model etc)
-// used to confirm "a change to the same hardware" — without SN context the change cannot be trusted
+// shown in the head line after the kind tag, used to confirm "a change to the same hardware"
 const contextRows = computed(() => {
   if (props.entry.kind !== 'changed') return []
   const changedFields = new Set((props.entry.changes ?? []).map((c) => c.field))
   return fullRows(props.entry.old as Record<string, unknown> | null).filter(
     (r) => !changedFields.has(r.key),
   )
+})
+
+// Head line text: identity + unchanged context in one line for changed entries, bare identity otherwise
+const headText = computed(() => {
+  const rows = contextRows.value
+  return rows.length ? rows.map((r) => r.value).join(' · ') : props.identity
 })
 </script>
 
@@ -112,7 +115,7 @@ const contextRows = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   background: var(--el-fill-color-light);
 }
 .identity {
@@ -124,7 +127,7 @@ const contextRows = computed(() => {
   white-space: nowrap;
 }
 .entry-body {
-  padding: 6px 12px;
+  padding: 10px 16px 12px;
 }
 .is-added .entry-body {
   background: #f0f9eb;
@@ -146,16 +149,6 @@ const contextRows = computed(() => {
   text-align: right;
 }
 .mono {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-}
-.context-row {
-  padding: 2px 4px 6px;
-  border-bottom: 1px dashed var(--el-border-color-lighter);
-  margin-bottom: 4px;
-}
-.context-text {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 .old-val {

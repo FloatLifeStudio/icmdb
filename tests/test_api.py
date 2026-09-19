@@ -871,3 +871,31 @@ def test_api_key_auth_flow(client):
         json={"offline_threshold_hours": 24, "api_key_enabled": True},
     )
     assert client.post("/api/v1/devices", json=make_push(), headers=headers).status_code == 401
+
+
+def test_push_duplicate_identities_deduped(client):
+    """Duplicate hardware identities in one payload are deduped (keep the first), no 500"""
+    push = {
+        "agent": {"source": "collector", "full_sync": True},
+        "os": {"hostname": "demo-node-01"},
+        "hardware": {
+            "nics": [
+                {"name": "eth0", "mac": "02:00:00:00:00:02",
+                 "ips": [{"ip": "198.51.100.21", "prefix_length": 24}]},
+                {"name": "eth0", "mac": "02:00:00:00:00:03", "ips": []},
+            ],
+            "gpu": {"slots": [
+                {"uuid": "GPU-dup-001", "name": "A800", "size": 80, "size_unit": "GB"},
+                {"uuid": "GPU-dup-001", "name": "A800-dup", "size": 80, "size_unit": "GB"},
+            ]},
+        },
+    }
+    r = client.post("/api/v1/devices", json=push)
+    assert r.status_code == 200
+    assert r.json()["result"] == "created"
+
+    detail = client.get("/api/v1/devices/1").json()
+    assert len(detail["gpus"]) == 1
+    assert detail["gpus"][0]["name"] == "A800"
+    assert [n["name"] for n in detail["nics"]] == ["eth0"]
+    assert detail["nics"][0]["mac"] == "02:00:00:00:00:02"

@@ -147,18 +147,36 @@ class HardwareInfo(BaseModel):
     gpu: GpuInfo | None = None
 
     @model_validator(mode="after")
-    def _drop_null_identity(self) -> "HardwareInfo":
+    def _normalise_identity(self) -> "HardwareInfo":
+        """Drop null-identity entries (failed collection) and dedup repeated identities (keep the first)
+
+        Duplicate identities in one payload would otherwise break the unique constraints on ingest
+        """
+        if self.nics:
+            self.nics = self._dedup(self.nics, key=lambda n: n.name)
         if self.memory:
-            self.memory.slots = [s for s in self.memory.slots if s.slot]
+            self.memory.slots = self._dedup(self.memory.slots, key=lambda s: s.slot)
         if self.cpus:
-            self.cpus = [c for c in self.cpus if c.slot]
+            self.cpus = self._dedup(self.cpus, key=lambda c: c.slot)
         if self.disks:
-            self.disks = [d for d in self.disks if d.serial_number]
+            self.disks = self._dedup(self.disks, key=lambda d: d.serial_number)
         if self.psus:
-            self.psus = [p for p in self.psus if p.serial_number]
+            self.psus = self._dedup(self.psus, key=lambda p: p.serial_number)
         if self.gpu:
-            self.gpu.slots = [g for g in self.gpu.slots if g.uuid]
+            self.gpu.slots = self._dedup(self.gpu.slots, key=lambda g: g.uuid)
         return self
+
+    @staticmethod
+    def _dedup(entries: list, key) -> list:
+        seen: set = set()
+        out = []
+        for entry in entries:
+            k = key(entry)
+            if not k or k in seen:
+                continue
+            seen.add(k)
+            out.append(entry)
+        return out
 
 
 class DevicePush(BaseModel):

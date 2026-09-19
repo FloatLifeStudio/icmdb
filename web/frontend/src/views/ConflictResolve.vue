@@ -415,6 +415,9 @@ async function submit() {
 .sections :deep(.el-collapse-item__header) {
   font-weight: bold;
 }
+.sections :deep(.el-collapse-item__content) {
+  padding: 4px 10px 16px;
+}
 .field-row {
   display: flex;
   align-items: baseline;
