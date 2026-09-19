@@ -1,4 +1,4 @@
-"""推送处理服务测试:三分支、pending 合并、真实采集示例 JSON 端到端。"""
+"""Push processing service tests: three branches, pending merge, real collector example JSON end-to-end"""
 
 import json
 from datetime import datetime
@@ -10,12 +10,12 @@ from cmdb.models import Device, Nic, NicIP, PendingChange
 from cmdb.schemas import DevicePush, normalise_legacy
 from cmdb.services.ingest import ingest_push
 
-# naive UTC(与库中存取格式一致)
+# naive UTC (matches the database storage format)
 RECEIVED_AT = datetime(2026, 9, 11, 15, 30, 0)
 
 
 def make_push(**overrides) -> DevicePush:
-    """构造新格式推送体(2 块网卡),可按字段覆盖;旧键名自动映射到新结构。"""
+    """Build a new-format push payload (2 NICs), overridable per field; legacy keys map onto the new structure"""
     base = {
         "agent": {"source": "collector", "full_sync": True},
         "os": {"hostname": "S1A01DC-VL101"},
@@ -34,7 +34,7 @@ def make_push(**overrides) -> DevicePush:
             ],
         },
     }
-    # 便捷覆盖:旧键名映射到新结构
+    # convenience overrides: legacy keys map onto the new structure
     for key in ("nics", "memory", "cpus", "disks", "psus"):
         if key in overrides:
             base["hardware"][key] = overrides.pop(key)
@@ -49,7 +49,7 @@ def make_push(**overrides) -> DevicePush:
     hostname = overrides.pop("hostname", None)
     if hostname:
         base["os"]["hostname"] = hostname
-    base.update(overrides)  # mgmt 等同名字段直接覆盖
+    base.update(overrides)  # same-name fields like mgmt override directly
     return DevicePush(**base)
 
 
@@ -79,7 +79,7 @@ def test_unchanged_branch(engine):
 
         assert first["result"] == "created"
         assert second["result"] == "unchanged"
-        # 不重复建设备
+        # no duplicate device created
         devices = session.exec(select(Device)).all()
         assert len(devices) == 1
         assert session.exec(select(PendingChange)).all() == []
@@ -94,10 +94,10 @@ def test_diff_created_branch(engine):
 
         assert result["result"] == "diff_created"
         assert result["pending_change_id"] is not None
-        # 现有数据未变
+        # existing data unchanged
         device = get_device(session, "S1A01DC-VL101")
         assert device.mgmt_ip == "192.168.10.101"
-        # pending 记录生成
+        # pending record created
         pending = session.get(PendingChange, result["pending_change_id"])
         assert pending.status == "pending"
         assert pending.diff["fields"] == [
@@ -106,7 +106,7 @@ def test_diff_created_branch(engine):
 
 
 def test_conflict_pushes_replace_with_latest(engine):
-    """多次冲突推送未裁决:以最新一次推送的 diff 为准,不累计。"""
+    """Multiple unresolved conflict pushes: the latest push's diff wins, no accumulation"""
     with Session(engine) as session:
         ingest_push(session, make_push(), RECEIVED_AT)
         first = ingest_push(
@@ -123,19 +123,19 @@ def test_conflict_pushes_replace_with_latest(engine):
 
         assert first["result"] == "diff_created"
         assert second["result"] == "diff_created"
-        # 仍是同一条 pending
+        # still the same pending record
         assert second["pending_change_id"] == first["pending_change_id"]
         pendings = session.exec(select(PendingChange)).all()
         assert len(pendings) == 1
         diff = pendings[0].diff
-        # 整体替换:只剩最新一次推送的差异(mgmt.ip 已回到库中值,不再待裁决)
+        # whole replacement: only the latest push's differences remain (mgmt.ip is back to the db value, no longer pending)
         fields = {f["field"]: f for f in diff["fields"]}
         assert fields["hardware.chassis_serial_number"]["new"] == "PF4ABC999999"
         assert "mgmt.ip" not in fields
 
 
 def test_gpu_added_replaced_by_latest_push(engine):
-    """第一次推 2 块 GPU,未裁决又推 2 块不同 UUID 的 GPU:待裁决以最后一次为准。"""
+    """First push of 2 GPUs, then 2 GPUs with different UUIDs while unresolved: the pending change uses the last push"""
     with Session(engine) as session:
         ingest_push(session, make_push(), RECEIVED_AT)
         first = ingest_push(
@@ -161,7 +161,7 @@ def test_gpu_added_replaced_by_latest_push(engine):
         pendings = session.exec(select(PendingChange)).all()
         assert len(pendings) == 1
         uuids = {g["uuid"] for g in pendings[0].diff["gpus"]}
-        # 只保留最新一次推送的 2 块,不累计成 4 块
+        # only the latest push's 2 GPUs kept, not accumulated into 4
         assert uuids == {"GPU-ccc", "GPU-ddd"}
 
 
@@ -182,7 +182,7 @@ def test_full_sync_removed_nic_in_diff(engine):
 
 
 def test_push_timestamp_normalized_to_utc(engine):
-    """推送体 timestamp 带时区时归一化为 naive UTC。"""
+    """A push timestamp with a timezone is normalized to naive UTC"""
     with Session(engine) as session:
         push = make_push(timestamp=datetime.fromisoformat("2026-09-11T23:30:00+08:00"))
         result = ingest_push(session, push, RECEIVED_AT)
@@ -192,7 +192,7 @@ def test_push_timestamp_normalized_to_utc(engine):
 
 
 def test_real_collector_example_json(engine):
-    """用户真实采集示例 JSON(新格式,4 块网卡)端到端推送。"""
+    """End-to-end push of a real user collector example JSON (new format, 4 NICs)"""
     example_path = Path(__file__).parent / "data" / "collector_example.json"
     raw = json.loads(example_path.read_text(encoding="utf-8"))
     push = DevicePush(**raw)
@@ -205,17 +205,17 @@ def test_real_collector_example_json(engine):
         assert device.serial_number == "PF4ABC123456"
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
         assert len(nics) == 4
-        # last_pushed_at 取 agent.timestamp(2026-09-13T10:00+08:00 -> UTC)
+        # last_pushed_at comes from agent.timestamp (2026-09-13T10:00+08:00 -> UTC)
         assert device.last_pushed_at == datetime(2026, 9, 13, 2, 0, 0)
 
-        # 再次推送一致数据 -> unchanged
+        # pushing identical data again -> unchanged
         again = ingest_push(session, push, RECEIVED_AT)
         assert again["result"] == "unchanged"
 
 
 def test_iagent_format_payload(engine):
-    """iagent 采集器实采格式:virt 字段、null 身份条目丢弃、ips=null、
-    mgmt=null、timestamp 空串兜底。"""
+    """iagent collector real-world format: virt field, null identity entries dropped, ips=null,
+    mgmt=null, empty timestamp fallback"""
     raw = {
         "agent": {"version": "0.3.0", "source": "iagent", "timestamp": "",
                   "full_sync": True},
@@ -237,7 +237,7 @@ def test_iagent_format_payload(engine):
             "memory": {
                 "slots": [
                     {"slot": "DIMM_A1", "size": 32, "size_unit": "GB"},
-                    # 采集失败的槽位:slot 为 null,整条丢弃
+                    # failed collection slot: slot is null, the whole entry is dropped
                     {"slot": None, "size": None, "size_unit": None},
                 ]
             },
@@ -248,7 +248,7 @@ def test_iagent_format_payload(engine):
             "disks": [
                 {"serial_number": "S5XNX0GF123456", "type": "SSD",
                  "size": 480, "size_unit": "GB"},
-                # SN 采集失败 -> 丢弃
+                # SN collection failed -> dropped
                 {"serial_number": None, "type": "HDD"},
             ],
             "psus": [{"serial_number": None, "max_power_w": 2700}],
@@ -256,14 +256,14 @@ def test_iagent_format_payload(engine):
                 "slots": [
                     {"uuid": "GPU-9a2b3c4d", "name": "NVIDIA A800-SXM4-80GB",
                      "size": 80, "size_unit": "GB"},
-                    # uuid 采集失败 -> 丢弃
+                    # uuid collection failed -> dropped
                     {"uuid": None, "name": "NVIDIA A800-SXM4-80GB"},
                 ]
             },
         },
     }
     push = DevicePush(**raw)
-    # null 身份条目在 schema 层被丢弃
+    # null identity entries are dropped at the schema layer
     assert len(push.hardware.memory.slots) == 1
     assert len(push.hardware.cpus) == 1
     assert len(push.hardware.disks) == 1
@@ -277,9 +277,9 @@ def test_iagent_format_payload(engine):
         device = get_device(session, "GPU-NODE-07")
         assert device.os_virt == "kvm"
         assert device.os_type == "linux"
-        # timestamp 空串 -> 未采集,取接收时间兜底
+        # empty timestamp -> not collected, falls back to the received time
         assert device.last_pushed_at == RECEIVED_AT
-        # mgmt=null -> 不写管理口
+        # mgmt=null -> management interface not written
         assert device.mgmt_mac is None and device.mgmt_ip is None
 
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
@@ -287,20 +287,20 @@ def test_iagent_format_payload(engine):
         nic0 = next(n for n in nics if n.name == "eth0")
         nic1 = next(n for n in nics if n.name == "eth1")
         assert nic0.mac == "D0:8D:7D:C2:F7:2A"
-        # eth0 ips=null -> 无 IP;eth1 有 IP
+        # eth0 ips=null -> no IP; eth1 has one
         assert session.exec(
             select(NicIP).where(NicIP.nic_id == nic0.id)
         ).all() == []
         ips1 = session.exec(select(NicIP).where(NicIP.nic_id == nic1.id)).all()
         assert [(i.ip, i.prefix_length) for i in ips1] == [("10.20.0.7", 24)]
 
-        # 一致数据重推 -> unchanged(不产生 pending)
+        # re-pushing identical data -> unchanged (no pending created)
         again = ingest_push(session, push, RECEIVED_AT)
         assert again["result"] == "unchanged"
 
 
 def test_iagent_virt_change_goes_to_diff(engine):
-    """virt 变化进主机字段 diff。"""
+    """A virt change goes into the host field diff"""
     with Session(engine) as session:
         first = make_push(
             hostname="S1A01DC-VL101",

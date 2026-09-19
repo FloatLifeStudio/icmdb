@@ -60,7 +60,7 @@
 </template>
 
 <style>
-/* 全局重置:去掉浏览器默认 8px 外边距(登录页渐变贴边,主布局撑满) */
+/* Global reset: remove the browser's default 8px body margin (login gradient stays flush, main layout fills) */
 body {
   margin: 0;
 }
@@ -78,24 +78,24 @@ const pendingCount = ref(0)
 const username = ref('')
 const role = ref('viewer')
 
-// 待裁决数量气泡:进入应用、切换页面时刷新(裁决提交后由 ConflictResolve 调 loadPendingCount)
+// Pending count badge: refreshed on app entry and page switch (ConflictResolve calls loadPendingCount after a resolve is submitted)
 async function loadPendingCount() {
   try {
     const res = await api.dashboard()
     pendingCount.value = res.pending_changes
   } catch {
-    // 静默失败,不影响页面使用
+    // Fail silently, page stays usable
   }
 }
 
-// 当前登录用户与角色;未登录静默
+// Currently signed-in user and role; silent when not signed in
 async function loadUsername() {
   try {
     const res = await api.me()
     username.value = res.username
     role.value = res.role
   } catch {
-    // 静默失败
+    // Fail silently
   }
 }
 
@@ -107,7 +107,7 @@ async function logout() {
   }
 }
 
-// 修改自己的密码(所有角色可用)
+// Change own password (available to all roles)
 const pwdVisible = ref(false)
 const pwdForm = ref({ old: '', new: '', confirm: '' })
 

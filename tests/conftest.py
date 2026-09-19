@@ -1,4 +1,4 @@
-"""测试公共 fixture:临时 SQLite 库,每个用例独立。"""
+"""Shared test fixtures: temporary SQLite database, isolated per test case"""
 
 import pytest
 from sqlmodel import Session
@@ -16,7 +16,7 @@ def engine(tmp_path):
 
 @pytest.fixture()
 def client(engine, monkeypatch):
-    """TestClient,API 依赖指向临时库。"""
+    """TestClient with API dependencies pointed at the temporary database"""
     from fastapi.testclient import TestClient
 
     from cmdb.database import get_session
@@ -27,10 +27,10 @@ def client(engine, monkeypatch):
             yield session
 
     app.dependency_overrides[get_session] = _get_session
-    # login/me/角色查询内部走 get_engine_cached,统一指向临时库
+    # login/me/role queries go through get_engine_cached, point it at the temp db
     monkeypatch.setattr("cmdb.database.get_engine_cached", lambda: engine)
     with TestClient(app) as c:
-        # 默认已登录(admin),登录/鉴权专项测试用 guest fixture
+        # logged in as admin by default, use the guest fixture for auth tests
         c.post("/api/v1/auth/login", json={"username": "admin", "password": "admin"})
         yield c
     app.dependency_overrides.clear()
@@ -38,7 +38,7 @@ def client(engine, monkeypatch):
 
 @pytest.fixture()
 def guest(engine, monkeypatch):
-    """未登录的 TestClient,鉴权专项测试用。"""
+    """TestClient without login, used for auth-specific tests"""
     from fastapi.testclient import TestClient
 
     from cmdb.database import get_session

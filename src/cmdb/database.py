@@ -1,4 +1,4 @@
-"""SQLite 连接与建表(WAL 模式)。"""
+"""SQLite connection and table creation (WAL mode)"""
 
 from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -7,7 +7,7 @@ from cmdb.config import settings
 
 
 def make_engine(db_path: str | None = None):
-    """创建 SQLite engine,启用 WAL 与外键约束。"""
+    """Create a SQLite engine with WAL and foreign key constraints enabled"""
     path = db_path or settings.db_path
     engine = create_engine(
         f"sqlite:///{path}", connect_args={"check_same_thread": False}
@@ -24,14 +24,14 @@ def make_engine(db_path: str | None = None):
 
 
 def init_db(engine) -> None:
-    """建表(幂等)。"""
+    """Create tables (idempotent)"""
     SQLModel.metadata.create_all(engine)
 
 
 _engine = None
 
-# 轻量迁移:已有表补新列(SQLite ALTER TABLE);新库由 create_all 直接建出
-# 注意表名是 SQLModel 默认的类名小写:device / changehistory
+# Lightweight migrations: add new columns to existing tables (SQLite ALTER TABLE); fresh databases are built directly by create_all
+# Note the table names are SQLModel's default lowercase class names: device / changehistory
 _MIGRATIONS = {
     "changehistory": {"diff": "JSON"},
     "device": {
@@ -48,13 +48,13 @@ _MIGRATIONS = {
 
 
 def migrate(engine) -> None:
-    """检查既有表的列,补缺失的列 + 旧数据迁移(幂等)。"""
+    """Check the columns of existing tables, add missing columns + migrate old data (idempotent)"""
     with engine.connect() as conn:
         for table, cols in _MIGRATIONS.items():
             existing = {
                 row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")
             }
-            if not existing:  # 表还不存在,create_all 会带新列建出
+            if not existing:  # table doesn't exist yet, create_all will create it with the new columns
                 continue
             for col, ddl in cols.items():
                 if col not in existing:
@@ -62,7 +62,7 @@ def migrate(engine) -> None:
         _migrate_tags_column(conn)
         _migrate_disk_size(conn)
         _migrate_memory_size(conn)
-        # 存量表补索引(SQLModel create_all 不会给已存在的表加索引)
+        # Add indexes to existing tables (SQLModel create_all doesn't add indexes to existing tables)
         hcols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(changehistory)")}
         if hcols and "created_at" in hcols:
             conn.exec_driver_sql(
@@ -73,9 +73,9 @@ def migrate(engine) -> None:
 
 
 def _migrate_tags_column(conn) -> None:
-    """旧 device.tags 逗号分隔 TEXT 列 -> device_tag 表;迁完删列。
+    """Migrate the old device.tags comma-separated TEXT column -> device_tag table, drop the column afterwards
 
-    仅在列还存在时执行(device_tag 由 create_all 先建好)。
+    Only runs while the column still exists (device_tag is created first by create_all)
     """
     cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(device)")}
     if "tags" not in cols:
@@ -94,9 +94,9 @@ def _migrate_tags_column(conn) -> None:
 
 
 def _migrate_disk_size(conn) -> None:
-    """旧 disk 表补 size_gb 归一化列并回填(TB 按 1024 换算)。"""
+    """Add a normalized size_gb column to the old disk table and backfill (TB converted at 1024)"""
     cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(disk)")}
-    if "size_gb" in cols or not cols:  # 新库由 create_all 带出;表不存在则跳过
+    if "size_gb" in cols or not cols:  # fresh databases get it from create_all; skip when the table doesn't exist
         return
     conn.exec_driver_sql("ALTER TABLE disk ADD COLUMN size_gb INTEGER")
     conn.exec_driver_sql(
@@ -106,9 +106,9 @@ def _migrate_disk_size(conn) -> None:
 
 
 def _migrate_memory_size(conn) -> None:
-    """旧 memoryslot 表补 size/size_unit 列并从 size_gb 回填(旧数据全为 GB)。"""
+    """Add size/size_unit columns to the old memoryslot table and backfill from size_gb (old data is all GB)"""
     cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(memoryslot)")}
-    if "size" in cols or not cols:  # 新库由 create_all 带出;表不存在则跳过
+    if "size" in cols or not cols:  # fresh databases get them from create_all; skip when the table doesn't exist
         return
     conn.exec_driver_sql("ALTER TABLE memoryslot ADD COLUMN size INTEGER")
     conn.exec_driver_sql("ALTER TABLE memoryslot ADD COLUMN size_unit VARCHAR")
@@ -119,7 +119,7 @@ def _migrate_memory_size(conn) -> None:
 
 
 def get_engine_cached():
-    """进程级单例 engine,首次使用时建表 + 迁移。"""
+    """Process-level singleton engine, creates tables + migrates on first use"""
     global _engine
     if _engine is None:
         _engine = make_engine()
@@ -130,7 +130,7 @@ def get_engine_cached():
 
 
 def seed_admin(engine) -> None:
-    """users 表为空时,按环境变量配置种子 admin 账号。"""
+    """Seed an admin account from environment config when the users table is empty"""
     from cmdb.api.auth import hash_password
     from cmdb.config import settings
     from cmdb.models import User
@@ -149,6 +149,6 @@ def seed_admin(engine) -> None:
 
 
 def get_session():
-    """FastAPI 依赖:每个请求一个 Session。"""
+    """FastAPI dependency: one Session per request"""
     with Session(get_engine_cached()) as session:
         yield session

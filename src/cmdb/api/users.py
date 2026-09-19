@@ -1,4 +1,4 @@
-"""用户管理 API:仅 admin(中间件按角色拦截,此处再做兜底校验)。"""
+"""User management API: admin only (the middleware gates by role, here a fallback check runs again)"""
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -42,7 +42,7 @@ class UserUpdateIn(BaseModel):
 
 @router.get("")
 def list_users(session: Session = Depends(get_session)):
-    """用户列表。"""
+    """User list"""
     return {"items": [_to_out(u) for u in session.exec(select(User)).all()]}
 
 
@@ -50,7 +50,7 @@ def list_users(session: Session = Depends(get_session)):
 def create_user(
     body: UserIn, request: Request, session: Session = Depends(get_session)
 ):
-    """新增用户。"""
+    """Create a user"""
     if body.role not in _ROLES:
         raise HTTPException(status_code=422, detail=f"role 只能是 {' / '.join(_ROLES)}")
     if not body.username.strip() or not body.password:
@@ -82,7 +82,7 @@ def update_user(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    """重置密码 / 修改角色。"""
+    """Reset password / change role"""
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -113,7 +113,7 @@ def update_user(
 
 @router.delete("/{user_id}")
 def delete_user(user_id: int, request: Request, session: Session = Depends(get_session)):
-    """删除用户;不能删除自己与最后一个管理员。"""
+    """Delete a user; cannot delete yourself or the last admin"""
     if user := session.get(User, user_id):
         if user.username == current_username(request):
             raise HTTPException(status_code=409, detail="不能删除自己的账号")

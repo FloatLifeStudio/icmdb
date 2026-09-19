@@ -1,5 +1,7 @@
 # CMDB API 使用文档
 
+> English: [API.en.md](en/API.md)
+
 > Base URL: `http://<host>:8080/api/v1`
 > 响应格式:REST 风格,HTTP 状态码 + JSON body
 > 采集推送(POST /devices)是唯一的数据写入入口,**且不要求登录**(采集器无需改造)

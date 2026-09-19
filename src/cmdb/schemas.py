@@ -1,10 +1,10 @@
-"""Pydantic 推送体/响应模型,对应采集 JSON 结构。
+"""Pydantic push body / response models, matching the collection JSON structure
 
-对齐 iagent 采集器实采语义:
-- 单字段采集失败置 null,身份字段(网卡 name 之外的 slot/uuid/serial_number)可空,
-  身份为 null 的条目自动丢弃,不进 diff 与存储
-- 列表字段(nics.ips)可为 null
-- agent.timestamp 空串视为未采集
+Aligned with the iagent collector's actual collection semantics:
+- a single failed field is set to null, identity fields (slot/uuid/serial_number other than the nic name) may be null,
+  entries with a null identity are dropped automatically and never enter diff or storage
+- list fields (nics.ips) may be null
+- an empty agent.timestamp string is treated as not collected
 """
 
 from datetime import datetime
@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class MgmtInfo(BaseModel):
-    """管理口信息。"""
+    """Management interface info"""
 
     mac: str | None = None
     ip: str | None = None
@@ -21,14 +21,14 @@ class MgmtInfo(BaseModel):
 
 
 class NicIPIn(BaseModel):
-    """推送体中网卡上的单个 IP。"""
+    """A single IP on a nic in the push body"""
 
     ip: str
     prefix_length: int | None = None
 
 
 class NicIn(BaseModel):
-    """推送体中的单块网卡,ips 数量不定;采集器对无 IP 网卡置 ips=null。"""
+    """A single nic in the push body, variable number of ips; the collector sets ips=null for nics without an IP"""
 
     name: str
     mac: str | None = None
@@ -41,25 +41,25 @@ class NicIn(BaseModel):
 
 
 class AgentInfo(BaseModel):
-    """采集器信息:版本、来源标识、采集时间。"""
+    """Collector info: version, source identifier, collection time"""
 
     version: str | None = None
     source: str | None = None
     timestamp: datetime | None = None
-    # 全量同步标记:库中多出的硬件条目进 diff 候删;新格式默认全量
+    # Full sync flag: hardware entries missing from the inventory enter the diff candidates; the new format defaults to full sync
     full_sync: bool = True
 
     @field_validator("timestamp", mode="before")
     @classmethod
     def _empty_timestamp(cls, v):
-        # 采集器未采集时间时发空串,视为未采集
+        # The collector sends an empty string when no time was collected, treated as not collected
         if isinstance(v, str) and not v.strip():
             return None
         return v
 
 
 class OsInfo(BaseModel):
-    """操作系统信息,hostname 为设备唯一匹配键;virt 为虚拟化类型(bare_metal/kvm/...)。"""
+    """OS info, hostname is the unique device matching key; virt is the virtualization type (bare_metal/kvm/...)"""
 
     hostname: str
     type: str | None = None
@@ -69,7 +69,7 @@ class OsInfo(BaseModel):
 
 
 class GpuSlotIn(BaseModel):
-    """推送体中的单块 GPU,uuid 为身份(可为 null,自动丢弃)。"""
+    """A single GPU in the push body, uuid is the identity (may be null, dropped automatically)"""
 
     uuid: str | None = None
     name: str | None = None
@@ -81,13 +81,13 @@ class GpuSlotIn(BaseModel):
 
 
 class GpuInfo(BaseModel):
-    """推送体中的 GPU 信息。"""
+    """GPU info in the push body"""
 
     slots: list[GpuSlotIn] = []
 
 
 class MemorySlotIn(BaseModel):
-    """推送体中的单条内存,slot 为身份(可为 null,自动丢弃),如 DIMM_A1。"""
+    """A single memory stick in the push body, slot is the identity (may be null, dropped automatically), e.g. DIMM_A1"""
 
     slot: str | None = None
     manufacturer: str | None = None
@@ -100,20 +100,20 @@ class MemorySlotIn(BaseModel):
 
 
 class MemoryInfo(BaseModel):
-    """推送体中的内存信息。"""
+    """Memory info in the push body"""
 
     slots: list[MemorySlotIn] = []
 
 
 class CpuSlotIn(BaseModel):
-    """推送体中的单颗 CPU,slot 为身份(可为 null,自动丢弃),如 CPU0。"""
+    """A single CPU in the push body, slot is the identity (may be null, dropped automatically), e.g. CPU0"""
 
     slot: str | None = None
     model: str | None = None
 
 
 class DiskIn(BaseModel):
-    """推送体中的单块硬盘,serial_number 为身份(可为 null,自动丢弃),type 为 SSD / HDD。"""
+    """A single disk in the push body, serial_number is the identity (may be null, dropped automatically), type is SSD / HDD"""
 
     serial_number: str | None = None
     type: str | None = None
@@ -124,7 +124,7 @@ class DiskIn(BaseModel):
 
 
 class PsuIn(BaseModel):
-    """推送体中的单个电源模块,serial_number 为身份(可为 null,自动丢弃)。"""
+    """A single PSU module in the push body, serial_number is the identity (may be null, dropped automatically)"""
 
     serial_number: str | None = None
     manufacturer: str | None = None
@@ -133,9 +133,9 @@ class PsuIn(BaseModel):
 
 
 class HardwareInfo(BaseModel):
-    """硬件信息,chassis_serial_number 为整机序列号。
+    """Hardware info, chassis_serial_number is the chassis serial number
 
-    身份字段为 null 的条目(采集失败的槽位)自动丢弃,不影响整包接收。
+    Entries with a null identity field (failed slot collection) are dropped automatically, without affecting reception of the whole payload
     """
 
     chassis_serial_number: str | None = None
@@ -162,10 +162,10 @@ class HardwareInfo(BaseModel):
 
 
 class DevicePush(BaseModel):
-    """采集推送体(新格式):agent + os + mgmt + hardware。
+    """Collection push body (new format): agent + os + mgmt + hardware
 
-    agent.timestamp 缺省时由服务器接收时间兜底;agent.full_sync=true(默认)
-    表示全量同步,库中多出的硬件条目进 diff 候删。mgmt/hardware 为 null 视为未采集。
+    When agent.timestamp is missing it falls back to the server receive time; agent.full_sync=true (default)
+    means full sync, hardware entries missing from the inventory enter the diff candidates. null mgmt/hardware is treated as not collected
     """
 
     agent: AgentInfo = AgentInfo()
@@ -185,15 +185,15 @@ class DevicePush(BaseModel):
 
 
 def normalise_legacy(raw: dict) -> dict:
-    """旧格式(顶层 hostname/serial_number/nics 等)转换为新格式。
+    """Convert the legacy format (top-level hostname/serial_number/nics etc.) to the new format
 
-    新格式以 "os" 键为标志;旧采集器推送自动转换,不影响使用。
+    The new format is recognized by the "os" key; legacy collector pushes are converted automatically, no impact on usage
     """
     if "os" in raw:
         return raw
     memory = raw.get("memory")
     if memory:
-        # 旧格式内存槽位是 size_gb(GB 标称),转为 size + size_unit
+        # Legacy memory slots use size_gb (nominal GB), convert to size + size_unit
         for slot in memory.get("slots", []):
             if "size_gb" in slot and "size" not in slot:
                 slot["size"] = slot.pop("size_gb")
@@ -218,46 +218,46 @@ def normalise_legacy(raw: dict) -> dict:
 
 
 class NicIPOut(NicIPIn):
-    """响应中的 IP(含 id)。"""
+    """IP in responses (with id)"""
 
     id: int
 
 
 class MemorySlotOut(MemorySlotIn):
-    """响应中的内存槽位(含 id 与归一化容量)。"""
+    """Memory slot in responses (with id and normalized capacity)"""
 
     id: int
     size_gb: int | None = None
 
 
 class CpuSlotOut(CpuSlotIn):
-    """响应中的 CPU 槽位(含 id)。"""
+    """CPU slot in responses (with id)"""
 
     id: int
 
 
 class DiskOut(DiskIn):
-    """响应中的硬盘(含 id 与归一化容量)。"""
+    """Disk in responses (with id and normalized capacity)"""
 
     id: int
     size_gb: int | None = None
 
 
 class GpuOut(GpuSlotIn):
-    """响应中的 GPU(含 id 与归一化容量)。"""
+    """GPU in responses (with id and normalized capacity)"""
 
     id: int
     size_gb: int | None = None
 
 
 class PsuOut(PsuIn):
-    """响应中的电源模块(含 id)。"""
+    """PSU module in responses (with id)"""
 
     id: int
 
 
 class NicOut(BaseModel):
-    """响应中的网卡(含 id 与 IP 列表)。"""
+    """Nic in responses (with id and IP list)"""
 
     id: int
     name: str
@@ -266,7 +266,7 @@ class NicOut(BaseModel):
 
 
 class DeviceOut(BaseModel):
-    """设备详情响应。"""
+    """Device detail response"""
 
     id: int
     hostname: str
@@ -276,7 +276,7 @@ class DeviceOut(BaseModel):
     kernel: str | None = None
     os_virt: str | None = None
     agent_version: str | None = None
-    # CMDB 元数据(UI 可编辑,推送不改)
+    # CMDB metadata (editable in the UI, untouched by pushes)
     location: str | None = None
     owner: str | None = None
     purpose: str | None = None
@@ -286,7 +286,7 @@ class DeviceOut(BaseModel):
     last_pushed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
-    # 动态计算:active / suspected_offline
+    # Computed dynamically: active / suspected_offline
     status: str
     tags: list[str] = []
     nics: list[NicOut] = []
@@ -298,18 +298,18 @@ class DeviceOut(BaseModel):
 
 
 class DeviceCreatedOut(BaseModel):
-    """推送响应:result 三分支 created / unchanged / diff_created。"""
+    """Push response: result has three branches created / unchanged / diff_created"""
 
     result: str
     device_id: int
-    # diff_created 时返回待裁决记录 id
+    # When diff_created, returns the pending change record id
     pending_change_id: int | None = None
 
 
 class ResolutionIn(BaseModel):
-    """裁决请求体:每条 diff 条目选 "new"(采用新数据)或 "old"(保留现状)。
+    """Resolution request body: each diff entry picks "new" (adopt new data) or "old" (keep current state)
 
-    对 removed 网卡/内存槽位,"new" 即删除该条目。
+    For removed nics/memory slots, "new" means deleting the entry
     """
 
     field_choices: dict[str, str] = {}
@@ -322,13 +322,13 @@ class ResolutionIn(BaseModel):
 
 
 class TagUpdate(BaseModel):
-    """标签更新:全量替换为给定标签列表。"""
+    """Tag update: fully replaced by the given tag list"""
 
     tags: list[str] = []
 
 
 class MetadataIn(BaseModel):
-    """设备元数据更新(位置/负责人/用途):None = 不改,空串 = 清空。"""
+    """Device metadata update (location/owner/purpose): None = no change, empty string = clear"""
 
     location: str | None = None
     owner: str | None = None
@@ -336,6 +336,6 @@ class MetadataIn(BaseModel):
 
 
 class BatchDeleteIn(BaseModel):
-    """批量删除的设备 id 列表。"""
+    """List of device ids to batch delete"""
 
     ids: list[int]

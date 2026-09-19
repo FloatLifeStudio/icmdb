@@ -1,14 +1,14 @@
-"""裁决应用:按条目选择新旧、更新设备数据、写 change_history。
+"""Resolution application: pick new/old per entry, update device data, write change_history
 
-裁决请求体约定:
+Resolution request body convention:
 
 {
-  "field_choices": {"mgmt.ip": "new"},          // 主机字段:选新值还是保留旧值
-  "nic_choices": {"eth3": "new", "eth1": "old"} // 网卡条目:新增/候删选 new,保留现状选 old
+  "field_choices": {"mgmt.ip": "new"},          // host field: pick the new value or keep the old one
+  "nic_choices": {"eth3": "new", "eth1": "old"} // nic entries: added/removed pick new, keep current state picks old
 }
 
-统一语义:每条 diff 条目选 "new"(采用新数据)或 "old"(保留现状)。
-对 removed 网卡,"new" 即删除该网卡。
+Unified semantics: each diff entry picks "new" (adopt new data) or "old" (keep current state)
+For removed nics, "new" means deleting the nic
 """
 
 from sqlmodel import Session, select
@@ -28,7 +28,7 @@ from cmdb.models import (
     utcnow,
 )
 
-# 主机字段路径 -> Device 属性
+# Host field path -> Device attribute
 _FIELD_ATTRS = {
     "hardware.chassis_serial_number": "serial_number",
     "os.type": "os_type",
@@ -61,7 +61,7 @@ _GPU_FIELDS = (
 
 
 def _apply_memory(session: Session, device: Device, entry: dict) -> None:
-    """按裁决结果处理单个内存槽位条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    """Handle a single memory slot entry per the resolution (kind=added/removed/changed, choices already filtered to new)"""
     slot = entry["slot"]
     existing = session.exec(
         select(MemorySlot).where(
@@ -70,7 +70,7 @@ def _apply_memory(session: Session, device: Device, entry: dict) -> None:
     ).first()
 
     if entry["kind"] == "added":
-        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+        if existing is not None:  # already exists (e.g. leftover from an old diff), skip idempotently
             return
         new = entry["new"]
         session.add(
@@ -99,20 +99,20 @@ def _apply_memory(session: Session, device: Device, entry: dict) -> None:
     for change in entry.get("changes", []):
         if change["field"] in _MEMORY_FIELDS:
             setattr(existing, change["field"], change["new"])
-    # 容量归一化列随 size/size_unit 变化重算
+    # Normalized capacity column is recomputed when size/size_unit changes
     if existing.size is not None:
         existing.size_gb = normalized_size_gb(existing.size, existing.size_unit)
 
 
 def _apply_gpu(session: Session, device: Device, entry: dict) -> None:
-    """按裁决结果处理单个 GPU 条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    """Handle a single GPU entry per the resolution (kind=added/removed/changed, choices already filtered to new)"""
     uuid_ = entry["uuid"]
     existing = session.exec(
         select(Gpu).where(Gpu.device_id == device.id, Gpu.uuid == uuid_)
     ).first()
 
     if entry["kind"] == "added":
-        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+        if existing is not None:  # already exists (e.g. leftover from an old diff), skip idempotently
             return
         new = entry["new"]
         session.add(
@@ -145,14 +145,14 @@ def _apply_gpu(session: Session, device: Device, entry: dict) -> None:
 
 
 def _apply_cpu(session: Session, device: Device, entry: dict) -> None:
-    """按裁决结果处理单个 CPU 槽位条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    """Handle a single CPU slot entry per the resolution (kind=added/removed/changed, choices already filtered to new)"""
     slot = entry["slot"]
     existing = session.exec(
         select(Cpu).where(Cpu.device_id == device.id, Cpu.slot == slot)
     ).first()
 
     if entry["kind"] == "added":
-        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+        if existing is not None:  # already exists (e.g. leftover from an old diff), skip idempotently
             return
         session.add(
             Cpu(device_id=device.id, slot=slot, model=entry["new"].get("model"))
@@ -178,7 +178,7 @@ _PSU_FIELDS = ("manufacturer", "model", "max_power_w")
 
 
 def _apply_disk(session: Session, device: Device, entry: dict) -> None:
-    """按裁决结果处理单块硬盘条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    """Handle a single disk entry per the resolution (kind=added/removed/changed, choices already filtered to new)"""
     sn = entry["serial_number"]
     existing = session.exec(
         select(Disk).where(
@@ -187,7 +187,7 @@ def _apply_disk(session: Session, device: Device, entry: dict) -> None:
     ).first()
 
     if entry["kind"] == "added":
-        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+        if existing is not None:  # already exists (e.g. leftover from an old diff), skip idempotently
             return
         new = entry["new"]
         session.add(
@@ -216,13 +216,13 @@ def _apply_disk(session: Session, device: Device, entry: dict) -> None:
     for change in entry.get("changes", []):
         if change["field"] in _DISK_FIELDS:
             setattr(existing, change["field"], change["new"])
-    # 容量归一化列随 size/size_unit 变化重算
+    # Normalized capacity column is recomputed when size/size_unit changes
     if existing.size is not None:
         existing.size_gb = normalized_size_gb(existing.size, existing.size_unit)
 
 
 def _apply_psu(session: Session, device: Device, entry: dict) -> None:
-    """按裁决结果处理单个电源模块条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    """Handle a single PSU module entry per the resolution (kind=added/removed/changed, choices already filtered to new)"""
     sn = entry["serial_number"]
     existing = session.exec(
         select(Psu).where(
@@ -231,7 +231,7 @@ def _apply_psu(session: Session, device: Device, entry: dict) -> None:
     ).first()
 
     if entry["kind"] == "added":
-        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+        if existing is not None:  # already exists (e.g. leftover from an old diff), skip idempotently
             return
         new = entry["new"]
         session.add(
@@ -260,7 +260,7 @@ def _apply_psu(session: Session, device: Device, entry: dict) -> None:
 
 
 def _apply_nic(session: Session, device: Device, entry: dict) -> None:
-    """按裁决结果处理单个网卡条目(kind=added/removed/changed,选择已过滤为 new)。"""
+    """Handle a single nic entry per the resolution (kind=added/removed/changed, choices already filtered to new)"""
     kind = entry["kind"]
     name = entry["name"]
     existing = session.exec(
@@ -268,7 +268,7 @@ def _apply_nic(session: Session, device: Device, entry: dict) -> None:
     ).first()
 
     if kind == "added":
-        if existing is not None:  # 已存在(如旧 diff 残留)则幂等跳过
+        if existing is not None:  # already exists (e.g. leftover from an old diff), skip idempotently
             return
         nic = Nic(device_id=device.id, name=name, mac=entry["new"].get("mac"))
         session.add(nic)
@@ -284,7 +284,7 @@ def _apply_nic(session: Session, device: Device, entry: dict) -> None:
             return
         for nip in session.exec(select(NicIP).where(NicIP.nic_id == existing.id)).all():
             session.delete(nip)
-        session.flush()  # 先删子表;无 relationship 时 UoW 删除顺序不保证
+        session.flush()  # delete child rows first; without relationships the UoW delete order isn't guaranteed
         session.delete(existing)
         return
 
@@ -297,10 +297,10 @@ def _apply_nic(session: Session, device: Device, entry: dict) -> None:
         elif change["field"] == "ips":
             new_ips = {ip["ip"]: ip["prefix_length"] for ip in change["new"]}
             current = session.exec(select(NicIP).where(NicIP.nic_id == existing.id)).all()
-            for nip in current:  # 删除新列表里没有的
+            for nip in current:  # delete ones missing from the new list
                 if nip.ip not in new_ips:
                     session.delete(nip)
-            for ip, prefix in new_ips.items():  # 补上缺的
+            for ip, prefix in new_ips.items():  # add the missing ones
                 if not any(nip.ip == ip for nip in current):
                     session.add(NicIP(nic_id=existing.id, ip=ip, prefix_length=prefix))
 
@@ -316,10 +316,10 @@ def apply_resolution(
     psu_choices: dict[str, str] | None = None,
     gpu_choices: dict[str, str] | None = None,
 ) -> dict:
-    """应用裁决:选择 new 的条目生效,选择 old 的保留现状。
+    """Apply the resolution: entries choosing new take effect, entries choosing old keep the current state
 
-    返回 {"applied": [生效摘要], "pending": PendingChange}。
-    pending 标记 applied;有实际改动时写 change_history。
+    Returns {"applied": [applied summaries], "pending": PendingChange}
+    pending is marked applied; change_history is written when there are actual changes
     """
     device = session.get(Device, pending.device_id)
     if device is None:

@@ -1,1 +1,1 @@
-"""业务逻辑层:推送处理、字段级 diff、裁决应用。"""
+"""Business logic layer: push processing, field-level diff, resolution application"""

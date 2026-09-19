@@ -1,4 +1,4 @@
-"""FastAPI app 工厂:/api 路由挂载 + 前端静态托管。"""
+"""FastAPI app factory: /api routers + frontend static hosting"""
 
 import tomllib
 from pathlib import Path
@@ -22,7 +22,7 @@ from cmdb.config import settings
 
 
 def _version() -> str:
-    """从 pyproject.toml 读版本号,读不到回退 unknown。"""
+    """Read the version from pyproject.toml, fall back to unknown"""
     for parent in Path(__file__).parents:
         pyproject = parent / "pyproject.toml"
         if pyproject.exists():
@@ -35,20 +35,20 @@ def _version() -> str:
 
 
 class SPAStaticFiles(StaticFiles):
-    """前端 SPA 静态托管:文件不存在时回退到 index.html,支持前端路由刷新。"""
+    """Static hosting for the frontend SPA: falls back to index.html for missing files, supports frontend route refresh"""
 
     async def get_response(self, path, scope):
         try:
             return await super().get_response(path, scope)
         except StarletteHTTPException as exc:
-            # 未知 API 路径不回退,保持 404
+            # Unknown API paths don't fall back, keep the 404
             if exc.status_code == 404 and not path.startswith("api/"):
                 return await super().get_response("index.html", scope)
             raise
 
 
 def _is_admin_path(path: str, method: str) -> bool:
-    """仅 admin 可操作的接口(其他用户只读)。"""
+    """Admin-only endpoints (other users are read-only)"""
     if path.startswith("/api/v1/users"):
         return True
     if path.startswith("/api/v1/audit-logs"):
@@ -81,9 +81,9 @@ def create_app() -> FastAPI:
     app.include_router(settings_router, prefix="/api/v1")
     app.include_router(audit_logs_router, prefix="/api/v1")
 
-    # 会话与角色拦截:/api/v1 除推送(采集器无需登录)与登录/会话检查外均要求登录;
-    # 写操作(裁决/删除/标签/用户管理)仅 admin;角色从库中实时查询,变更即时生效。
-    # 静态资源(登录页本身)不拦截,由前端路由守卫跳转
+    # Session and role gating: /api/v1 requires login except for push (collectors need no login) and login/session check;
+    # write operations (resolve/delete/tags/user management) are admin only; roles are queried from the DB in real time, changes take effect immediately
+    # Static assets (the login page itself) are not intercepted, the frontend route guard handles redirects
     exempt = {
         ("/api/v1/devices", "POST"),
         ("/api/v1/auth/login", "POST"),
@@ -101,7 +101,7 @@ def create_app() -> FastAPI:
                 return JSONResponse({"detail": "需要管理员权限"}, status_code=403)
         return await call_next(request)
 
-    # 前端构建产物由 FastAPI 托管,单服务单端口;目录不存在(纯后端 dev)时跳过
+    # Frontend build output is hosted by FastAPI, single service single port; skipped when the directory doesn't exist (backend-only dev)
     static_dir = Path(settings.static_dir)
     if static_dir.exists():
         app.mount("/", SPAStaticFiles(directory=static_dir, html=True), name="static")
@@ -109,7 +109,7 @@ def create_app() -> FastAPI:
 
 
 def _user_role(username: str) -> str:
-    """从库中实时查用户角色(角色变更即时生效)。"""
+    """Query the user role from the DB in real time (role changes take effect immediately)"""
     from cmdb.database import get_engine_cached
     from cmdb.models import User
 

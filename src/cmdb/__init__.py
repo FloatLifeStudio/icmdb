@@ -1,3 +1,3 @@
-"""CMDB v2 — 采集推送、字段级 diff 冲突裁决、存储与展示。"""
+"""CMDB v2 — collection push, field-level diff conflict resolution, storage and display"""
 
 __version__ = "2.0.0"

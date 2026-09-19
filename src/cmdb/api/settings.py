@@ -1,4 +1,4 @@
-"""系统设置:DB 键值存储,环境变量作默认值。"""
+"""System settings: DB key-value store, environment variables as defaults"""
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
@@ -16,7 +16,7 @@ OFFLINE_THRESHOLD_KEY = "offline_threshold_hours"
 
 
 def get_offline_threshold_hours(session: Session) -> int:
-    """疑似下线阈值(小时):DB 设置优先,回退环境变量(天 × 24)。"""
+    """Suspected offline threshold (hours): DB setting takes priority, falls back to environment variables (days x 24)"""
     row = session.exec(
         select(SystemSetting).where(SystemSetting.key == OFFLINE_THRESHOLD_KEY)
     ).first()

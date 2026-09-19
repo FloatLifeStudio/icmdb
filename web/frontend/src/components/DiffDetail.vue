@@ -192,14 +192,14 @@ const props = defineProps<{
   diff: PendingChange['diff'] | null
 }>()
 
-// 列宽自适应:按各列最长内容算 min-width,默认刚好放下、完整显示
+// Column width auto-fit: compute min-width from the longest content per column, fully visible by default
 type DiffEntry = { kind: string; changes?: { field: string; old: unknown; new: unknown }[] }
 const diffWidths = computed(() => {
   const d = props.diff
   const changeCol: FitCol<DiffEntry> = {
     key: 'changes',
     label: '变化',
-    // 变化列一行一条,列宽只需放下最长的一条
+    // One change per line in the change column, the column only needs to fit the longest one
     text: (r) =>
       longestLine([...(r.changes ?? []).map((c) => changeRepr(c)), emptyHint[r.kind] ?? '-']),
   }
@@ -243,8 +243,8 @@ const emptyHint: Record<string, string> = {
   changed: '-',
 }
 
-// 条目标识的可读摘要:added 取新对象、removed/changed 取旧对象,
-// 名称/厂商/型号在前,SN/UUID 作附注(仅凭 UUID/SN 看不出是哪个硬件)
+// Readable identity summary: added takes the new object, removed/changed takes the old object
+// name/manufacturer/model first, SN/UUID as annotation (UUID/SN alone does not tell which hardware)
 function ident(
   row: {
     kind: string

@@ -1,4 +1,4 @@
-"""设备 API:POST 推送、GET 列表/详情/导出/批量删除、标签更新、CSV 导入、DELETE。"""
+"""Device API: POST push, GET list/detail/export/batch-delete, tag update, CSV import, DELETE"""
 
 import csv
 import io
@@ -55,19 +55,19 @@ from cmdb.services.ingest import ingest_push
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
-# 列表接口允许排序的字段(白名单,防注入)
+# Fields the list endpoint allows sorting by (whitelist, prevents injection)
 _SORTABLE = {"hostname", "serial_number", "mgmt_ip", "last_pushed_at"}
 
 _Children = dict
 
 
 def _offline_threshold(session: Session) -> timedelta:
-    """疑似下线阈值:DB 系统设置优先,回退环境变量。"""
+    """Suspected offline threshold: DB system setting takes priority, falls back to environment variables"""
     return timedelta(hours=get_offline_threshold_hours(session))
 
 
 def _device_status(device: Device, threshold: timedelta) -> str:
-    """动态计算状态:超阈值未推送标记疑似下线。"""
+    """Compute the status dynamically: no push beyond the threshold marks suspected offline"""
     if device.last_pushed_at is None:
         return "suspected_offline"
     if utcnow() - device.last_pushed_at > threshold:
@@ -80,11 +80,11 @@ def _split_tags(tags: str | None) -> list[str]:
 
 
 def _load_children(session: Session, device_ids: list[int]) -> _Children:
-    """批量加载多台设备的子表数据(每类一次 IN 查询,避免 N+1)。
+    """Batch-load child table data for multiple devices (one IN query per kind, avoids N+1)
 
-    返回 {"nics": {device_id: [Nic]}, "ips": {nic_id: [NicIP]},
+    Returns {"nics": {device_id: [Nic]}, "ips": {nic_id: [NicIP]},
           "memory": {device_id: [...]}, "cpus": ..., "disks": ...,
-          "psus": ..., "tags": {device_id: [str]}}。
+          "psus": ..., "tags": {device_id: [str]}}
     """
     if not device_ids:
         return {"nics": {}, "ips": {}, "memory": {}, "cpus": {}, "disks": {},
@@ -134,7 +134,7 @@ def _load_children(session: Session, device_ids: list[int]) -> _Children:
 
 
 def _device_tags_by_id(session: Session, device_id: int) -> list[str]:
-    """单台设备的标签名列表。"""
+    """Tag name list for a single device"""
     return [
         row.name
         for row in session.exec(
@@ -146,7 +146,7 @@ def _device_tags_by_id(session: Session, device_id: int) -> list[str]:
 
 
 def _replace_tags(session: Session, device_id: int, tags: list[str]) -> None:
-    """全量替换设备标签(先删旧再插新,flush 避免唯一约束冲突)。"""
+    """Fully replace device tags (delete old rows first, then insert new, flush avoids unique constraint conflicts)"""
     for row in session.exec(
         select(DeviceTag).where(DeviceTag.device_id == device_id)
     ).all():
@@ -157,9 +157,9 @@ def _replace_tags(session: Session, device_id: int, tags: list[str]) -> None:
 
 
 def _delete_device_children(session: Session, device_id: int) -> None:
-    """删除设备的子表数据:网卡 + IP + 标签 + 待裁决记录 + 硬件。
+    """Delete a device's child table data: nics + IPs + tags + pending records + hardware
 
-    无 relationship 时 UoW 删除顺序不保证:删子表后显式 flush 再删父行。
+    Without relationships the UoW delete order isn't guaranteed: after deleting child rows, flush explicitly before deleting the parent row
     """
     nics = session.exec(select(Nic).where(Nic.device_id == device_id)).all()
     for nic in nics:
@@ -199,9 +199,9 @@ def _to_out(
     children: _Children | None = None,
     threshold: timedelta | None = None,
 ) -> DeviceOut:
-    """Device + 子表数据 -> DeviceOut(含动态状态)。
+    """Device + child table data -> DeviceOut (with dynamic status)
 
-    children 由 _load_children 批量加载;单台设备时可省略(内部补一次)。
+    children are batch-loaded by _load_children; can be omitted for a single device (filled in once internally)
     """
     if children is None:
         children = _load_children(session, [device.id])
@@ -282,9 +282,9 @@ def _to_out(
 
 @router.post("")
 def push_device(payload: dict = Body(...), session: Session = Depends(get_session)):
-    """采集推送(唯一数据写入入口)。
+    """Collection push (the only data write entry point)
 
-    新格式:agent + os + mgmt + hardware;旧格式(顶层 hostname 等)自动转换。
+    New format: agent + os + mgmt + hardware; legacy format (top-level hostname etc.) is converted automatically
     """
     try:
         push = DevicePush(**normalise_legacy(payload))
@@ -305,12 +305,12 @@ def list_devices(
     sort_order: str = "asc",
     session: Session = Depends(get_session),
 ):
-    """设备列表:分页、模糊搜索、状态/标签筛选、排序。
+    """Device list: pagination, fuzzy search, status/tag filtering, sorting
 
-    - search 覆盖 hostname / serial_number / mgmt_ip / 网卡业务 IP(反查)
-    - status 由 last_pushed_at 动态计算,筛选同样按阈值在 SQL 层完成
-    - tag 按标签精确匹配
-    - sort_by 白名单字段排序,sort_order 为 asc / desc
+    - search covers hostname / serial_number / mgmt_ip / nic business IPs (reverse lookup)
+    - status is computed dynamically from last_pushed_at, filtering is also done at the SQL layer by threshold
+    - tag matches the tag exactly
+    - sort_by sorts by a whitelist field, sort_order is asc / desc
     """
     query = select(Device)
     if search:
@@ -320,7 +320,7 @@ def list_devices(
             Device.serial_number.like(like),
             Device.mgmt_ip.like(like),
         )
-        # 按网卡业务 IP 反查设备
+        # Reverse-lookup devices by nic business IP
         ip_device_ids = session.exec(
             select(Nic.device_id)
             .join(NicIP, NicIP.nic_id == Nic.id)
@@ -330,7 +330,7 @@ def list_devices(
             cond = or_(cond, Device.id.in_(ip_device_ids))
         query = query.where(cond)
     if tag:
-        # 标签精确匹配(device_tag 表,一行一个 device-tag 对)
+        # Exact tag match (device_tag table, one device-tag pair per row)
         tagged_ids = select(DeviceTag.device_id).where(DeviceTag.name == tag)
         query = query.where(Device.id.in_(tagged_ids))
     if status in ("active", "suspected_offline"):
@@ -348,12 +348,12 @@ def list_devices(
         query = query.order_by(col.desc() if sort_order == "desc" else col.asc())
     else:
         query = query.order_by(Device.hostname)
-    # count 用聚合查询,避免全量行加载
+    # count uses an aggregate query, avoids loading all rows
     total = session.exec(select(func.count()).select_from(query.subquery())).one()
     devices = session.exec(
         query.offset((page - 1) * page_size).limit(page_size)
     ).all()
-    # 子表批量加载(每类一次 IN 查询),避免每台设备反复查询
+    # Batch-load child tables (one IN query per kind), avoids repeated queries per device
     children = _load_children(session, [d.id for d in devices])
     threshold = _offline_threshold(session)
     items = [_to_out(session, d, children, threshold) for d in devices]
@@ -362,7 +362,7 @@ def list_devices(
 
 @router.get("/{device_id}")
 def get_device(device_id: int, session: Session = Depends(get_session)):
-    """设备详情。"""
+    """Device detail"""
     device = session.get(Device, device_id)
     if device is None:
         raise HTTPException(status_code=404, detail="device not found")
@@ -373,7 +373,7 @@ def get_device(device_id: int, session: Session = Depends(get_session)):
 def delete_device(
     device_id: int, request: Request, session: Session = Depends(get_session)
 ):
-    """手工删除设备:硬删设备与网卡数据,change_history 保留。"""
+    """Manually delete a device: hard-deletes the device and nic data, change_history is kept"""
     device = session.get(Device, device_id)
     if device is None:
         raise HTTPException(status_code=404, detail="device not found")
@@ -388,7 +388,7 @@ def delete_device(
 def batch_delete(
     body: BatchDeleteIn, request: Request, session: Session = Depends(get_session)
 ):
-    """批量删除设备:硬删,行为同单个删除。"""
+    """Batch delete devices: hard delete, same behavior as single delete"""
     deleted = []
     for device_id in body.ids:
         device = session.get(Device, device_id)
@@ -406,7 +406,7 @@ def batch_delete(
 def update_tags(
     device_id: int, body: TagUpdate, request: Request, session: Session = Depends(get_session)
 ):
-    """更新设备标签(全量替换)。"""
+    """Update device tags (full replacement)"""
     device = session.get(Device, device_id)
     if device is None:
         raise HTTPException(status_code=404, detail="device not found")
@@ -425,7 +425,7 @@ def update_metadata(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    """更新设备元数据(机房/机柜位置、负责人、用途;推送不改,仅 UI 编辑)。"""
+    """Update device metadata (data center/rack location, owner, purpose; untouched by pushes, edited in the UI only)"""
     device = session.get(Device, device_id)
     if device is None:
         raise HTTPException(status_code=404, detail="device not found")
@@ -444,7 +444,7 @@ def update_metadata(
 
 @router.get("/export/csv")
 def export_csv(session: Session = Depends(get_session)):
-    """导出全部设备为 CSV(UTF-8 BOM,Excel 中文兼容)。"""
+    """Export all devices as CSV (UTF-8 BOM, Excel Chinese-compatible)"""
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(
@@ -492,7 +492,7 @@ def export_csv(session: Session = Depends(get_session)):
                 " | ".join(gpu_parts),
             ]
         )
-    content = "\ufeff" + buf.getvalue()  # UTF-8 BOM,Excel 中文兼容
+    content = "\ufeff" + buf.getvalue()  # UTF-8 BOM, Excel Chinese-compatible
     return Response(
         content=content,
         media_type="text/csv; charset=utf-8",
@@ -501,7 +501,7 @@ def export_csv(session: Session = Depends(get_session)):
 
 
 def _nics_from_csv(nics_str: str | None) -> list[NicIn]:
-    """解析导出格式的 nics 列:"eth0(MAC): ip/24, ip/24 | eth1(MAC): ..."。"""
+    """Parse the export-format nics column: "eth0(MAC): ip/24, ip/24 | eth1(MAC): ...\""""
     nics: list[NicIn] = []
     if not nics_str:
         return nics
@@ -524,7 +524,7 @@ def _nics_from_csv(nics_str: str | None) -> list[NicIn]:
 
 
 def _gpus_from_csv(gpus_str: str | None) -> list[GpuSlotIn]:
-    """解析导出格式的 gpu 列:"name(uuid): 80GB, driver 535.183.01, pcie 0000:1B:00.0"。"""
+    """Parse the export-format gpu column: "name(uuid): 80GB, driver 535.183.01, pcie 0000:1B:00.0\""""
     gpus: list[GpuSlotIn] = []
     if not gpus_str:
         return gpus
@@ -562,11 +562,11 @@ def _gpus_from_csv(gpus_str: str | None) -> list[GpuSlotIn]:
 async def import_csv(
     request: Request, file: UploadFile = File(...), session: Session = Depends(get_session)
 ):
-    """CSV 批量导入:逐行走与推送相同的清洗逻辑(hostname 匹配、diff 进待裁决)。
+    """CSV batch import: each row goes through the same cleaning logic as push (hostname matching, diff goes to pending)
 
-    行格式与导出一致,可直接回导;source 标记为 csv_import。
+    The row format matches the export and can be re-imported directly; source is marked as csv_import
     """
-    text = (await file.read()).decode("utf-8-sig")  # 兼容 BOM
+    text = (await file.read()).decode("utf-8-sig")  # BOM compatible
     reader = csv.DictReader(io.StringIO(text))
     summary = {"created": 0, "unchanged": 0, "diff_created": 0, "errors": []}
 
@@ -577,7 +577,7 @@ async def import_csv(
             summary["errors"].append(f"第 {row_no} 行:缺 hostname,已跳过")
             continue
         push = DevicePush(
-            # CSV 代表设备全量状态(agent.full_sync 默认 True)
+            # CSV represents the device's full state (agent.full_sync defaults to True)
             agent=AgentInfo(source="csv_import"),
             os=OsInfo(hostname=hostname),
             mgmt=MgmtInfo(
@@ -598,7 +598,7 @@ async def import_csv(
         result = ingest_push(session, push, utcnow(), update_last_pushed=False)
         summary[result["result"]] += 1
 
-        # 标签与元数据随导入设置(CMDB 元数据,不走推送清洗)
+        # Tags and metadata are set with the import (CMDB metadata, not pushed through push cleaning)
         meta = {
             key: (row.get(key) or "").strip()
             for key in ("location", "owner", "purpose")

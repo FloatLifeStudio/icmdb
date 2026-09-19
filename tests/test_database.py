@@ -1,4 +1,4 @@
-"""数据库层冒烟测试:建表、插入、唯一约束、WAL。"""
+"""Database layer smoke tests: table creation, insert, unique constraints, WAL"""
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -60,7 +60,7 @@ def test_wal_mode(engine):
 
 
 def test_migrate_adds_missing_columns(tmp_path):
-    """旧库(无 diff 列)迁移后补上新列;旧 tags 列迁到 devicetag 表后删列。"""
+    """An old database (without diff columns) gains the new columns after migration; the legacy tags column is migrated to the devicetag table then dropped"""
     eng = make_engine(str(tmp_path / "old.db"))
     with eng.connect() as conn:
         conn.exec_driver_sql(
@@ -76,19 +76,19 @@ def test_migrate_adds_missing_columns(tmp_path):
         )
         conn.commit()
 
-    init_db(eng)  # 生产流程先 create_all(补建 devicetag 等新表)再迁移
+    init_db(eng)  # production flow runs create_all first (creates devicetag and other new tables) then migrates
     migrate(eng)
     with eng.connect() as conn:
         cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(device)")}
-        assert "tags" not in cols  # 旧列已删除
+        assert "tags" not in cols  # legacy column dropped
         row = conn.exec_driver_sql(
             "SELECT hostname FROM device WHERE hostname = 'old-host'"
         ).fetchone()
-        assert row[0] == "old-host"  # 已有数据保留
+        assert row[0] == "old-host"  # existing data preserved
         tags = conn.exec_driver_sql(
             "SELECT name FROM devicetag WHERE device_id = 1 ORDER BY id"
         ).fetchall()
-        assert [t[0] for t in tags] == ["生产", "web"]  # 旧标签迁入新表
+        assert [t[0] for t in tags] == ["生产", "web"]  # legacy tags migrated into the new table
         hcols = {
             row[1] for row in conn.exec_driver_sql("PRAGMA table_info(changehistory)")
         }

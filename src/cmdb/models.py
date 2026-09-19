@@ -1,5 +1,5 @@
-"""SQLModel 表模型:device / device_tag / nic / nic_ip / memoryslot / cpu /
-disk / psu / pending_change / changehistory。"""
+"""SQLModel table models: device / device_tag / nic / nic_ip / memoryslot / cpu /
+disk / psu / pending_change / changehistory"""
 
 from datetime import datetime, timezone
 
@@ -8,19 +8,19 @@ from sqlmodel import Field, SQLModel
 
 
 def utcnow() -> datetime:
-    """统一 naive UTC 时间(SQLite DATETIME 存取不带 tzinfo)。"""
+    """Uniform naive UTC time (SQLite DATETIME stores and reads without tzinfo)"""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def to_naive_utc(dt: datetime) -> datetime:
-    """归一化为 naive UTC:带时区先转 UTC 再去 tzinfo。"""
+    """Normalize to naive UTC: timezone-aware values are first converted to UTC, then stripped of tzinfo"""
     if dt.tzinfo is None:
         return dt
     return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 class Device(SQLModel, table=True):
-    """主机主表,hostname 为唯一匹配键。"""
+    """Device main table, hostname is the unique matching key"""
 
     id: int | None = Field(default=None, primary_key=True)
     hostname: str = Field(unique=True, index=True)
@@ -33,7 +33,7 @@ class Device(SQLModel, table=True):
     kernel: str | None = None
     os_virt: str | None = None
     agent_version: str | None = None
-    # CMDB 元数据(UI 可编辑,推送不改)
+    # CMDB metadata (editable in the UI, untouched by pushes)
     location: str | None = None
     owner: str | None = None
     purpose: str | None = None
@@ -43,9 +43,9 @@ class Device(SQLModel, table=True):
 
 
 class DeviceTag(SQLModel, table=True):
-    """设备标签(CMDB 元数据,UI 可编辑,不属于采集数据)。
+    """Device tags (CMDB metadata, editable in the UI, not collection data)
 
-    一行一个 device-tag 对,精确匹配筛选;替代旧的逗号分隔 TEXT 列。
+    One device-tag pair per row, used for exact-match filtering; replaces the old comma-separated TEXT column
     """
 
     __table_args__ = (UniqueConstraint("device_id", "name"),)
@@ -56,7 +56,7 @@ class DeviceTag(SQLModel, table=True):
 
 
 class Nic(SQLModel, table=True):
-    """网卡表,name 为网卡身份(device 内唯一)。"""
+    """Nic table, name is the nic identity (unique within a device)"""
 
     __table_args__ = (UniqueConstraint("device_id", "name"),)
 
@@ -67,7 +67,7 @@ class Nic(SQLModel, table=True):
 
 
 class NicIP(SQLModel, table=True):
-    """网卡上的 IP 表。"""
+    """IP table on a nic"""
 
     __table_args__ = (UniqueConstraint("nic_id", "ip"),)
 
@@ -78,9 +78,9 @@ class NicIP(SQLModel, table=True):
 
 
 class MemorySlot(SQLModel, table=True):
-    """内存槽位表,slot 为身份(device 内唯一),如 DIMM_A1。
+    """Memory slot table, slot is the identity (unique within a device), e.g. DIMM_A1
 
-    size + size_unit 为标称容量原始值;size_gb 为归一化数值列。
+    size + size_unit are the raw nominal capacity values; size_gb is the normalized numeric column
     """
 
     __table_args__ = (UniqueConstraint("device_id", "slot"),)
@@ -99,9 +99,9 @@ class MemorySlot(SQLModel, table=True):
 
 
 class Gpu(SQLModel, table=True):
-    """GPU 表,uuid 为身份(device 内唯一)。
+    """GPU table, uuid is the identity (unique within a device)
 
-    size + size_unit 为标称显存原始值;size_gb 为归一化数值列。
+    size + size_unit are the raw nominal VRAM values; size_gb is the normalized numeric column
     """
 
     __table_args__ = (UniqueConstraint("device_id", "uuid"),)
@@ -119,7 +119,7 @@ class Gpu(SQLModel, table=True):
 
 
 class Cpu(SQLModel, table=True):
-    """CPU 槽位表,slot 为身份(device 内唯一),如 CPU0。"""
+    """CPU slot table, slot is the identity (unique within a device), e.g. CPU0"""
 
     __table_args__ = (UniqueConstraint("device_id", "slot"),)
 
@@ -130,16 +130,16 @@ class Cpu(SQLModel, table=True):
 
 
 def normalized_size_gb(size: int | None, size_unit: str | None) -> int | None:
-    """容量归一化为 GB(理论标称值):TB 按 1024 换算,其余按 GB。"""
+    """Normalize capacity to GB (theoretical nominal value): TB converted at 1024, everything else treated as GB"""
     if size is None:
         return None
     return size * 1024 if (size_unit or "").upper() == "TB" else size
 
 
 class Disk(SQLModel, table=True):
-    """硬盘表,serial_number 为身份(device 内唯一),type 为 SSD / HDD。
+    """Disk table, serial_number is the identity (unique within a device), type is SSD / HDD
 
-    size + size_unit 为标称容量原始值;size_gb 为归一化数值列,便于排序与统计。
+    size + size_unit are the raw nominal capacity values; size_gb is the normalized numeric column for easier sorting and statistics
     """
 
     __table_args__ = (UniqueConstraint("device_id", "serial_number"),)
@@ -156,7 +156,7 @@ class Disk(SQLModel, table=True):
 
 
 class Psu(SQLModel, table=True):
-    """电源模块表,serial_number 为身份(device 内唯一)。"""
+    """PSU module table, serial_number is the identity (unique within a device)"""
 
     __table_args__ = (UniqueConstraint("device_id", "serial_number"),)
 
@@ -169,14 +169,14 @@ class Psu(SQLModel, table=True):
 
 
 class PendingChange(SQLModel, table=True):
-    """冲突待裁决,同一设备仅一条 pending,新推送合并进同一条。"""
+    """Conflict pending resolution, one pending per device, new pushes merge into the same one"""
 
     id: int | None = Field(default=None, primary_key=True)
     device_id: int = Field(foreign_key="device.id", index=True)
     source: str | None = None
-    # 推送原始 JSON(含 timestamp / full_sync / source)
+    # Raw push JSON (includes timestamp / full_sync / source)
     payload: dict = Field(sa_column=Column(JSON))
-    # 字段级差异清单 JSON,结构见 services/diff.py
+    # Field-level diff list JSON, structure see services/diff.py
     diff: dict = Field(sa_column=Column(JSON))
     # pending / applied / discarded
     status: str = Field(default="pending", index=True)
@@ -185,10 +185,10 @@ class PendingChange(SQLModel, table=True):
 
 
 class ChangeHistory(SQLModel, table=True):
-    """变更流水,仅记录裁决生效的改动。
+    """Change history, records only changes applied via resolution
 
-    device_id 不设外键:设备硬删后本表记录保留,历史独立于设备存活。
-    diff 存裁决时的完整差异清单,供历史详情查看。
+    device_id has no foreign key: records in this table survive hard device deletion, history is independent of device lifetime
+    diff stores the full diff list at resolution time, for viewing in the history detail
     """
 
     id: int | None = Field(default=None, primary_key=True)
@@ -200,7 +200,7 @@ class ChangeHistory(SQLModel, table=True):
 
 
 class User(SQLModel, table=True):
-    """用户表:admin 可操作(裁决/删除/标签/用户管理),viewer 只可查看。"""
+    """User table: admin can operate (resolve/delete/tags/user management), viewer can only view"""
 
     id: int | None = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True)
@@ -210,7 +210,7 @@ class User(SQLModel, table=True):
 
 
 class SystemSetting(SQLModel, table=True):
-    """系统设置键值存储(UI 可在线修改,环境变量作默认值)。"""
+    """System setting key-value store (editable online in the UI, environment variables as defaults)"""
 
     id: int | None = Field(default=None, primary_key=True)
     key: str = Field(unique=True, index=True)
@@ -219,7 +219,7 @@ class SystemSetting(SQLModel, table=True):
 
 
 class AuditLog(SQLModel, table=True):
-    """操作审计日志:记录用户的管理操作(删除/裁决/用户管理/设置修改等)。"""
+    """Audit log: records users' admin operations (delete/resolve/user management/settings changes etc.)"""
 
     id: int | None = Field(default=None, primary_key=True)
     username: str | None = Field(default=None, index=True)

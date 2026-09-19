@@ -1,7 +1,7 @@
-"""用户登录:users 表多账号,PBKDF2 哈希,HMAC 签名 cookie 会话。
+"""User login: multiple accounts in the users table, PBKDF2 hashing, HMAC-signed cookie sessions
 
-推送接口(POST /devices)不鉴权,采集器无需改造;其余 /api/v1 接口
-由 main.py 的中间件统一校验会话 cookie 与角色(admin 可操作,viewer 只读)。
+The push endpoint (POST /devices) needs no auth, collectors need no changes; the other /api/v1 endpoints
+are validated centrally by the main.py middleware for session cookie and role (admin can operate, viewer is read-only)
 """
 
 import hashlib
@@ -21,7 +21,7 @@ SESSION_COOKIE = "cmdb_session"
 
 
 def hash_password(password: str, salt: str | None = None) -> str:
-    """PBKDF2-SHA256 哈希,存 salt:digest。"""
+    """PBKDF2-SHA256 hash, stored as salt:digest"""
     salt = salt or secrets.token_hex(8)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000)
     return f"{salt}:{digest.hex()}"
@@ -43,19 +43,19 @@ def _sign(payload: str) -> str:
 
 
 def _make_token(username: str) -> str:
-    """token = 过期时间戳:用户名:HMAC 签名。"""
+    """token = expiry timestamp:username:HMAC signature"""
     expires = int(time.time()) + settings.session_expire_days * 86400
     payload = f"{expires}:{username}"
     return f"{payload}:{_sign(payload)}"
 
 
 def current_username(request: Request) -> str | None:
-    """从请求 cookie 取当前登录用户名。"""
+    """Get the current logged-in username from the request cookie"""
     return token_username(request.cookies.get(SESSION_COOKIE))
 
 
 def token_username(token: str | None) -> str | None:
-    """校验会话 token:签名正确、未过期,返回用户名;无效返回 None。"""
+    """Validate the session token: correct signature and not expired returns the username, invalid returns None"""
     if not token:
         return None
     payload, _, sig = token.rpartition(":")
@@ -84,7 +84,7 @@ class ChangePasswordIn(BaseModel):
 
 @router.post("/login")
 def login(body: LoginIn, response: Response):
-    """校验 users 表账号密码,签发会话 cookie。"""
+    """Validate the users table account password and issue a session cookie"""
     from cmdb.database import get_engine_cached
     from cmdb.models import User
 
@@ -106,7 +106,7 @@ def login(body: LoginIn, response: Response):
 
 @router.post("/change-password")
 def change_password(body: ChangePasswordIn, cmdb_session: str | None = Cookie(default=None, alias=SESSION_COOKIE)):
-    """当前登录用户修改自己的密码(需验证原密码),所有角色可用。"""
+    """The current logged-in user changes their own password (original password must be verified), available to all roles"""
     from cmdb.database import get_engine_cached
     from cmdb.models import User
 
@@ -129,14 +129,14 @@ def change_password(body: ChangePasswordIn, cmdb_session: str | None = Cookie(de
 
 @router.post("/logout")
 def logout(response: Response):
-    """清除会话 cookie。"""
+    """Clear the session cookie"""
     response.delete_cookie(SESSION_COOKIE)
     return {"ok": True}
 
 
 @router.get("/me")
 def me(cmdb_session: str | None = Cookie(default=None, alias=SESSION_COOKIE)):
-    """返回当前登录用户与角色;未登录返回 401,前端用它判断会话状态。"""
+    """Return the current logged-in user and role; 401 when not logged in, the frontend uses it to check session state"""
     from cmdb.database import get_engine_cached
     from cmdb.models import User
 

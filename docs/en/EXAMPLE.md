@@ -1,11 +1,11 @@
-# CMDB 示例数据文档
+# CMDB Example Data Guide
 
-> English version: [en/EXAMPLE.md](en/EXAMPLE.md)
+> Chinese version: [../EXAMPLE.md](../EXAMPLE.md)
 
-> 采集器推送格式与完整示例。接口细节见 [API.md](./API.md)。
-> 示例 JSON 文件:`tests/data/collector_example_full.json`(可直接用 curl 推送)。
+> Collector push format with a complete example. See [API.md](./API.md) for API details.
+> Example JSON file: `tests/data/collector_example_full.json` (can be pushed directly with curl).
 
-## 完整示例(全部硬件字段)
+## Complete Example (All Hardware Fields)
 
 ```json
 {
@@ -357,20 +357,20 @@
 }
 ```
 
-## 字段说明
+## Field Reference
 
-各字段含义与必填性见 [API.md](./API.md#1-采集推送) 的字段说明表,此处只列要点:
+For the meaning and requiredness of each field, see the field tables in [API.md](./API.md#1-collector-push); only the key points are listed here:
 
-- `agent` / `os` / `mgmt` / `hardware` 四段结构;`os.hostname` 是设备唯一匹配键
-- 各硬件条目的身份:网卡 `name`、内存/CPU `slot`、硬盘/电源 `serial_number`、GPU `uuid`
-- 所有硬件段均可选,不推不影响现有推送;`hardware.memory` / `cpus` / `disks` / `psus` / `gpu` 缺省即不更新对应类别
-- `agent.full_sync=true`(默认)= 全量同步:库中多出的网卡/内存/CPU/硬盘/电源/GPU 进 diff 候删
+- `agent` / `os` / `mgmt` / `hardware` four-section structure; `os.hostname` is the unique device matching key
+- Identity of each hardware entry: NICs `name`, memory/CPU `slot`, disks/PSUs `serial_number`, GPU `uuid`
+- All hardware sections are optional; omitting one does not affect existing pushes; a missing `hardware.memory` / `cpus` / `disks` / `psus` / `gpu` means that category is not updated
+- `agent.full_sync=true` (default) = full sync: NICs/memory/CPU/disks/PSUs/GPUs found in the DB beyond the push become diff candidates for deletion
 
-## iagent 采集器实采格式
+## iagent Collector Real-World Format
 
-iagent(Go 采集器)按同一四段结构推送,但对齐实采语义:**单字段采集失败置 null,
-身份为 null 的整条条目自动丢弃**(不进 diff 与存储),`mgmt` / `hardware` /
-`nics[].ips` 可为 null,`agent.timestamp` 未采集时发空串。典型推送体:
+iagent (a Go collector) pushes with the same four-section structure, but aligned with real-world collection semantics: **a single-field collection failure sets the field to null,
+and an entire entry whose identity is null is dropped automatically** (it never reaches diff or storage); `mgmt` / `hardware` /
+`nics[].ips` may be null, and `agent.timestamp` is sent as an empty string when not collected. A typical push body:
 
 ```json
 {
@@ -414,11 +414,11 @@ iagent(Go 采集器)按同一四段结构推送,但对齐实采语义:**单字�
 }
 ```
 
-服务端处理效果:身份为 null 的条目(空槽位内存、无 uuid 的 GPU、无 SN 的电源等)
-整条丢弃;`mgmt=null` 不写管理口;`timestamp=""` 取服务器接收时间兜底;
-`os.virt` 入库并在虚拟化类型变化时进 diff。
+Server-side processing: entries with a null identity (empty memory slots, GPUs without a uuid, PSUs without an SN, etc.)
+are dropped entirely; `mgmt=null` skips the management port; `timestamp=""` falls back to the server's receive time;
+`os.virt` is stored and enters the diff when the virtualization type changes.
 
-## 推送命令
+## Push Command
 
 ```bash
 curl -X POST http://<host>:8080/api/v1/devices \
@@ -426,11 +426,11 @@ curl -X POST http://<host>:8080/api/v1/devices \
   -d @tests/data/collector_example_full.json
 ```
 
-## 测试场景
+## Test Scenarios
 
-1. **首次推送** → `created`(hostname 不存在)或 `diff_created`(已存在,硬件条目作为新增条目进裁决)
-2. **字段变化再推**(如 DIMM_A1 换型号、CPU 换型号、`os.virt` 变化)→ `diff_created`,字段级 changed
-3. **full_sync=true 少一块硬件**(如删掉 DIMM_B1 或一块硬盘)→ 进 diff 候删,裁决选 `new` 即删除
-4. **重复推送相同数据** → `unchanged`
-5. **iagent 格式推送**(含 null 身份条目)→ null 条目丢弃,其余正常入库
-6. **裁决**:`POST /api/v1/pending-changes/{id}/resolve`,请求体逐条目选 `new` / `old`(默认 UI 全选新值);生效后写变更历史
+1. **First push** → `created` (hostname does not exist) or `diff_created` (already exists, hardware entries enter resolution as new entries)
+2. **Push again with changed fields** (e.g. DIMM_A1 with a different model, a different CPU model, a changed `os.virt`) → `diff_created`, with field-level changed entries
+3. **full_sync=true with one hardware item removed** (e.g. delete DIMM_B1 or a disk) → enters diff as a deletion candidate; choosing `new` in the resolution deletes it
+4. **Push the same data repeatedly** → `unchanged`
+5. **Push in iagent format** (with null-identity entries) → null entries are dropped, the rest are stored normally
+6. **Resolution**: `POST /api/v1/pending-changes/{id}/resolve`, choosing `new` / `old` per entry in the request body (the UI defaults to selecting all new values); once effective, the change is written to change history

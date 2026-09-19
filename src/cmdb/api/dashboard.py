@@ -1,4 +1,4 @@
-"""仪表盘 API:资产概览统计(只读)。"""
+"""Dashboard API: asset overview statistics (read-only)"""
 
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 @router.get("")
 def dashboard(session: Session = Depends(get_session)):
-    """资产概览:总数、活跃/疑似下线、待裁决数、最近变更。"""
+    """Asset overview: totals, active/suspected offline, pending count, recent changes"""
     devices = session.exec(select(Device)).all()
     threshold = _offline_threshold(session)
     active = sum(1 for d in devices if _device_status(d, threshold) == "active")

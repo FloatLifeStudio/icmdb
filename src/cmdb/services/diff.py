@@ -1,22 +1,22 @@
-"""字段级 diff:比较推送体与库中当前快照。
+"""Field-level diff: compare the push body against the current snapshot in the DB
 
-diff 结构约定(pending_changes.diff 存的就是它):
+Diff structure convention (this is what pending_changes.diff stores):
 
 {
   "fields": [ {"field": "mgmt.ip", "old": ..., "new": ...} ],
   "nics": [
     {"name": "eth1", "kind": "added|removed|changed",
      "changes": [ {"field": "mac"|"ips", "old": ..., "new": ...} ],
-     "old": {...完整旧网卡}|null, "new": {...完整新网卡}|null }
+     "old": {...full old nic}|null, "new": {...full new nic}|null }
   ],
   "has_changes": true
 }
 
-语义:
-- os.hostname 是匹配键,不参与 diff
-- 推送体中标量字段为 None 视为未采集,不清空库中已有数据
-- 硬件条目身份:网卡 name、内存/CPU slot、硬盘/电源 serial_number、GPU uuid
-- kind=removed 仅在 agent.full_sync=true 时产生(库中多出的条目候删)
+Semantics:
+- os.hostname is the matching key and never enters the diff
+- a scalar field of None in the push body is treated as not collected, it does not clear existing data in the DB
+- hardware entry identity: nic name, memory/CPU slot, disk/PSU serial_number, GPU uuid
+- kind=removed is only produced when agent.full_sync=true (entries missing from the inventory become deletion candidates)
 """
 
 from cmdb.schemas import (
@@ -29,7 +29,7 @@ from cmdb.schemas import (
     PsuIn,
 )
 
-# 主机字段:推送体字段路径 -> 快照键
+# Host fields: push body field path -> snapshot key
 _HOST_FIELDS = {
     "hardware.chassis_serial_number": "serial_number",
     "os.type": "os_type",
@@ -43,7 +43,7 @@ _HOST_FIELDS = {
 
 
 def _nic_repr(nic: NicIn) -> dict:
-    """网卡的完整表示,用于 added/removed 条目。"""
+    """Full representation of a nic, used for added/removed entries"""
     return {
         "name": nic.name,
         "mac": nic.mac,
@@ -52,7 +52,7 @@ def _nic_repr(nic: NicIn) -> dict:
 
 
 def _memory_repr(mem: MemorySlotIn) -> dict:
-    """内存槽位的完整表示,用于 added 条目。"""
+    """Full representation of a memory slot, used for added entries"""
     return {
         "slot": mem.slot,
         "manufacturer": mem.manufacturer,
@@ -66,7 +66,7 @@ def _memory_repr(mem: MemorySlotIn) -> dict:
 
 
 def _gpu_repr(gpu: GpuSlotIn) -> dict:
-    """GPU 的完整表示,用于 added 条目。"""
+    """Full representation of a GPU, used for added entries"""
     return {
         "uuid": gpu.uuid,
         "name": gpu.name,
@@ -79,7 +79,7 @@ def _gpu_repr(gpu: GpuSlotIn) -> dict:
 
 
 def _host_diff(snapshot: dict, push: DevicePush) -> list[dict]:
-    """主机字段级 diff,返回差异条目列表。"""
+    """Field-level diff of host fields, returns the list of diff entries"""
     pushed = {
         "hardware.chassis_serial_number": push.hardware.chassis_serial_number,
         "os.type": push.os.type,
@@ -103,7 +103,7 @@ def _host_diff(snapshot: dict, push: DevicePush) -> list[dict]:
 def _nics_diff(
     snapshot_nics: dict[str, dict], pushed_nics: list[NicIn], full_sync: bool
 ) -> list[dict]:
-    """网卡级 diff。snapshot_nics: {name: {"name", "mac", "ips": {ip: prefix}}}。"""
+    """Nic-level diff. snapshot_nics: {name: {"name", "mac", "ips": {ip: prefix}}}"""
     entries: list[dict] = []
     pushed_names = set()
 
@@ -186,7 +186,7 @@ def _memory_diff(
     pushed_slots: list[MemorySlotIn],
     full_sync: bool,
 ) -> list[dict]:
-    """内存槽位级 diff。snapshot_memory: {slot: {字段: 值}}。"""
+    """Memory slot-level diff. snapshot_memory: {slot: {field: value}}"""
     entries: list[dict] = []
     pushed_slots_names = set()
 
@@ -252,7 +252,7 @@ def _cpu_diff(
     pushed_cpus: list[CpuSlotIn],
     full_sync: bool,
 ) -> list[dict]:
-    """CPU 槽位级 diff。snapshot_cpus: {slot: {"slot", "model"}}。"""
+    """CPU slot-level diff. snapshot_cpus: {slot: {"slot", "model"}}"""
     entries: list[dict] = []
     pushed_slots = set()
 
@@ -305,7 +305,7 @@ def _disk_diff(
     pushed_disks: list[DiskIn],
     full_sync: bool,
 ) -> list[dict]:
-    """硬盘级 diff。身份 serial_number。snapshot_disks: {sn: {字段: 值}}。"""
+    """Disk-level diff. Identity is serial_number. snapshot_disks: {sn: {field: value}}"""
     entries: list[dict] = []
     pushed_sns = set()
 
@@ -383,7 +383,7 @@ def _psu_diff(
     pushed_psus: list[PsuIn],
     full_sync: bool,
 ) -> list[dict]:
-    """电源模块级 diff。身份 serial_number。snapshot_psus: {sn: {字段: 值}}。"""
+    """PSU module-level diff. Identity is serial_number. snapshot_psus: {sn: {field: value}}"""
     entries: list[dict] = []
     pushed_sns = set()
 
@@ -455,7 +455,7 @@ def _gpu_diff(
     pushed_gpus: list[GpuSlotIn],
     full_sync: bool,
 ) -> list[dict]:
-    """GPU 级 diff。身份 uuid。snapshot_gpus: {uuid: {字段: 值}}。"""
+    """GPU-level diff. Identity is uuid. snapshot_gpus: {uuid: {field: value}}"""
     entries: list[dict] = []
     pushed_uuids = set()
 
@@ -516,9 +516,9 @@ def _gpu_diff(
 
 
 def diff_push(snapshot: dict, push: DevicePush) -> dict:
-    """比较推送体与库中设备当前快照,返回完整 diff 清单。
+    """Compare the push body against the device's current snapshot in the DB, return the full diff list
 
-    snapshot 由 ingest 层从 ORM 对象构建:
+    snapshot is built by the ingest layer from ORM objects:
     {"serial_number", "mgmt_mac", "mgmt_ip", "mgmt_prefix_length",
      "os_type", "os_version", "kernel",
      "nics": {name: {...}}, "memory": {slot: {...}}, "cpus": {slot: {...}},

@@ -1,5 +1,7 @@
 # CMDB 数据与接口全景文档
 
+> English version: [en/OVERVIEW.md](en/OVERVIEW.md)
+
 本文档是 CMDB v2 的全景介绍:推送 JSON、数据库每张表、API 每个接口、每个字段的作用与对应关系,以及设计理由与合理性评审。日常操作速查见 [API.md](API.md),采集示例见 [EXAMPLE.md](EXAMPLE.md)。
 
 ---

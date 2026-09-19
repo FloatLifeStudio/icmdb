@@ -1,5 +1,6 @@
 # Changelog
 
+> English version: [docs/en/CHANGELOG.md](docs/en/CHANGELOG.md)
 格式参考 [Keep a Changelog](https://keepachangelog.com/),版本号遵循语义化版本。
 
 ## Unreleased

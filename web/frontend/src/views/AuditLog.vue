@@ -40,7 +40,7 @@ const usernameFilter = ref('')
 
 let timer: ReturnType<typeof setTimeout> | undefined
 function load() {
-  // 输入防抖,避免每敲一个字符发一次请求
+  // Debounce input, avoid firing a request on every keystroke
   clearTimeout(timer)
   timer = setTimeout(fetchLogs, 300)
 }

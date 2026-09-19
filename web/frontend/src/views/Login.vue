@@ -55,7 +55,7 @@ async function submit() {
 </script>
 
 <style scoped>
-/* 与工作台一致的浅色 Element Plus 风格 */
+/* Light Element Plus style consistent with the dashboard */
 .login-page {
   width: 100%;
   min-height: 100vh;

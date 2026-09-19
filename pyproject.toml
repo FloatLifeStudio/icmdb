@@ -1,7 +1,7 @@
 [project]
 name = "cmdb"
 version = "2.2.0"
-description = "CMDB v2 — 采集推送、字段级 diff 冲突裁决、存储与展示"
+description = "CMDB v2 — collector push, field-level diff conflict resolution, storage and display"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

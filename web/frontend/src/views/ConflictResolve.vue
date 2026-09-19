@@ -23,7 +23,7 @@
 
     <div class="detail">
       <template v-if="pending">
-        <!-- 摘要条:改动规模概览 + 提交按钮固定在顶部,不被内容推走 -->
+        <!-- Summary bar: change size overview + submit button pinned to the top, not pushed away by content -->
         <el-card v-if="hasEntries" class="card summary-card">
           <div class="summary-bar">
             <div class="summary-info">
@@ -181,7 +181,7 @@ import { api, PendingChange } from '../api'
 import { fieldLabel, fmtValue } from '../utils/diff'
 import DiffEntry from '../components/DiffEntry.vue'
 
-// 裁决提交成功后通知侧边栏气泡立即刷新
+// After a resolve is submitted, notify the sidebar badge to refresh immediately
 const refreshPendingCount = inject<() => void>('refreshPendingCount', () => {})
 const userRole = inject('userRole', ref('viewer'))
 const isAdmin = computed(() => userRole.value === 'admin')
@@ -199,7 +199,7 @@ const listLoading = ref(false)
 const resolving = ref(false)
 const tableRef = ref<TableInstance>()
 
-// 左侧列表限高内部滚动,窗口变窄时自适应
+// Left list capped with internal scrolling, adapts when the window narrows
 const listMaxHeight = ref(600)
 function onResize() {
   listMaxHeight.value = Math.max(300, window.innerHeight - 180)
@@ -211,10 +211,10 @@ onMounted(() => {
 })
 onBeforeUnmount(() => window.removeEventListener('resize', onResize))
 
-// 区块折叠状态:默认全部展开
+// Section collapse state: all expanded by default
 const openSections = ref<string[]>(['fields', 'nics', 'memory', 'cpus', 'disks', 'psus', 'gpus'])
 
-// 改动规模概览:全部分类计数
+// Change size overview: counts across all categories
 const counts = computed(() => {
   const d = pending.value?.diff
   const list = [
@@ -247,8 +247,8 @@ const hasEntries = computed(() => {
   )
 })
 
-// 条目标识的可读摘要:added 取新对象、removed/changed 取旧对象,
-// 用名称/厂商/型号拼出人类可读的条目名,SN/UUID 作附注(仅凭 UUID/SN 看不出是哪个硬件)
+// Readable identity summary: added takes the new object, removed/changed takes the old object
+// builds a human-readable entry name from name/manufacturer/model, SN/UUID as annotation (UUID/SN alone does not tell which hardware)
 function hwSummary(
   entry: {
     kind: string
@@ -266,7 +266,7 @@ function hwSummary(
 }
 
 function fmt(ts: string): string {
-  // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
+  // Backend stores naive UTC, append a Z marker and let the browser convert to the viewer's local timezone
   const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z'
   return new Date(utc).toLocaleString()
 }
@@ -285,7 +285,7 @@ async function load() {
 
 function selectPending(row: PendingChange | null) {
   pending.value = row
-  // 默认全部采用新值,用户可逐条改为保留旧值
+  // Default to adopting all new values, the user can switch individual ones to keep the old value
   fieldChoices.value = {}
   nicChoices.value = {}
   memoryChoices.value = {}
@@ -308,7 +308,7 @@ function selectPending(row: PendingChange | null) {
   }
 }
 
-// 一键全部保留旧值(不采用任何新数据,提交后仅标记 applied)
+// Keep all old values in one click (adopts no new data, only marked applied after submit)
 function keepAllOld() {
   if (!pending.value) return
   for (const f of pending.value.diff.fields) fieldChoices.value[f.field] = 'old'
@@ -329,7 +329,7 @@ async function submit() {
   if (!pending.value) return
   resolving.value = true
   const resolvedId = pending.value.id
-  // 记住当前项在列表中的位置,裁决后从刷新后列表的同一位置继续
+  // Remember the current item's position in the list, resume at the same position of the refreshed list after the resolve
   const idx = Math.max(0, pendings.value.findIndex((p) => p.id === resolvedId))
   try {
     const res = await api.resolve(resolvedId, {
@@ -347,7 +347,7 @@ async function submit() {
     }
     await load()
     refreshPendingCount()
-    // 自动切换到下一条:同一位置(即原下一条);裁决的是最后一条则回到列表开头
+    // Auto-advance to the next entry: same position (i.e. the original next one); if the last entry was resolved, back to the top of the list
     const rest = pendings.value
     const next = rest.length ? rest[idx % rest.length] : null
     selectPending(next)

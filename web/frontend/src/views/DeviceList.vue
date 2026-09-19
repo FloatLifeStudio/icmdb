@@ -148,7 +148,7 @@ function onSelectionChange(rows: DeviceOut[]) {
   selected.value = rows
 }
 
-// 输入防抖:停止输入 300ms 后再发请求
+// Debounce input: fire the request 300ms after typing stops
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 function debouncedLoad() {
   clearTimeout(searchTimer)
@@ -157,7 +157,7 @@ function debouncedLoad() {
 
 function fmt(ts: string | null): string {
   if (!ts) return '-'
-  // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
+  // Backend stores naive UTC, append a Z marker and let the browser convert to the viewer's local timezone
   const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z'
   return new Date(utc).toLocaleString()
 }
@@ -176,7 +176,7 @@ async function load() {
     })
     items.value = res.items
     total.value = res.total
-    // 当前页删空时回退到第一页,避免停在空页
+    // Fall back to the first page when the current page becomes empty, avoid staying on an empty page
     if (!res.items.length && page.value > 1) {
       page.value = 1
       await load()

@@ -1,4 +1,4 @@
-"""API 端到端测试:推送、列表、详情、裁决、删除、疑似下线。"""
+"""API end-to-end tests: push, list, detail, resolve, delete, suspected offline"""
 
 from datetime import timedelta
 from sqlmodel import Session, select
@@ -7,7 +7,7 @@ from cmdb.models import Device, utcnow
 
 
 def make_push(**overrides) -> dict:
-    """构造基础推送体,可按字段覆盖。"""
+    """Build a base push payload, overridable per field"""
     base = {
         "hostname": "S1A01DC-VL101",
         "serial_number": "PF4ABC123456",
@@ -54,7 +54,7 @@ def test_push_invalid_payload_422(client):
 
 
 def test_new_format_push_with_gpu(client):
-    """新格式推送:agent/os/hardware 结构,GPU 入库,os 字段存储。"""
+    """New format push: agent/os/hardware structure, GPU stored, os fields persisted"""
     push = {
         "agent": {"version": "0.1.0", "source": "collector",
                   "timestamp": "2026-09-13T10:00:00+08:00"},
@@ -86,7 +86,7 @@ def test_new_format_push_with_gpu(client):
 
 
 def test_legacy_format_compatible(client):
-    """旧格式(顶层 hostname 等)自动转换,旧采集器不断。"""
+    """Legacy format (top-level hostname etc.) auto-converted, old collectors keep working"""
     legacy = {
         "hostname": "S1A01DC-VL101",
         "serial_number": "PF4ABC123456",
@@ -127,7 +127,7 @@ def test_list_search_and_status_filter(client, engine):
     r = client.get("/api/v1/devices", params={"search": "S1A01DC"})
     assert r.json()["total"] == 1
 
-    # 手动把 last_pushed_at 推到 4 天前 -> suspected_offline
+    # manually backdate last_pushed_at by 4 days -> suspected_offline
     with Session(engine) as session:
         device = session.exec(select(Device)).one()
         device.last_pushed_at = utcnow() - timedelta(days=4)
@@ -148,17 +148,17 @@ def test_resolve_flow(client):
                             "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]}])
     pending_id = client.post("/api/v1/devices", json=push).json()["pending_change_id"]
 
-    # 待裁决列表
+    # pending resolution list
     items = client.get("/api/v1/pending-changes").json()["items"]
     assert len(items) == 1 and items[0]["id"] == pending_id
 
-    # diff 详情
+    # diff detail
     detail = client.get(f"/api/v1/pending-changes/{pending_id}").json()
     assert detail["payload"]["mgmt"]["ip"] == "192.168.10.200"
     fields = {f["field"] for f in detail["diff"]["fields"]}
     assert fields == {"mgmt.ip"}
 
-    # 裁决:mgmt.ip 用新值,eth1 删除
+    # resolve: use new value for mgmt.ip, delete eth1
     r = client.post(
         f"/api/v1/pending-changes/{pending_id}/resolve",
         json={"field_choices": {"mgmt.ip": "new"}, "nic_choices": {"eth1": "new"}},
@@ -166,12 +166,12 @@ def test_resolve_flow(client):
     assert r.status_code == 200
     assert r.json()["status"] == "applied"
 
-    # 设备数据已按裁决更新
+    # device data updated per the resolution
     device = client.get("/api/v1/devices/1").json()
     assert device["mgmt_ip"] == "192.168.10.200"
     assert [n["name"] for n in device["nics"]] == ["eth0"]
 
-    # 重复裁决 -> 409
+    # resolving twice -> 409
     r = client.post(
         f"/api/v1/pending-changes/{pending_id}/resolve",
         json={"field_choices": {}, "nic_choices": {}},
@@ -192,7 +192,7 @@ def test_resolve_discard(client):
     assert r.status_code == 200
 
     device = client.get("/api/v1/devices/1").json()
-    assert device["mgmt_ip"] == "192.168.10.101"  # 保留原值
+    assert device["mgmt_ip"] == "192.168.10.101"  # original value kept
 
 
 def test_change_history(client):
@@ -228,23 +228,23 @@ def test_list_sort_and_multi_field_search(client):
         mgmt={"mac": "AA:BB:CC:DD:EE:11", "ip": "10.0.0.5", "prefix_length": 24},
     ))
 
-    # 按管理 IP 倒序
+    # sort by management IP descending
     r = client.get("/api/v1/devices", params={"sort_by": "mgmt_ip", "sort_order": "desc"})
     items = r.json()["items"]
     assert items[0]["mgmt_ip"] > items[-1]["mgmt_ip"]
 
-    # 按管理 IP 升序
+    # sort by management IP ascending
     r = client.get("/api/v1/devices", params={"sort_by": "mgmt_ip", "sort_order": "asc"})
     items = r.json()["items"]
     assert items[0]["mgmt_ip"] < items[-1]["mgmt_ip"]
 
-    # 搜索覆盖序列号与管理 IP
+    # search covers serial number and management IP
     r = client.get("/api/v1/devices", params={"search": "PF4XYZ"})
     assert r.json()["total"] == 1
     r = client.get("/api/v1/devices", params={"search": "10.0.0.5"})
     assert r.json()["total"] == 1
 
-    # 非白名单字段排序 -> 回退默认 hostname 排序,不报错
+    # sorting by a non-whitelisted field -> falls back to default hostname sort, no error
     r = client.get("/api/v1/devices", params={"sort_by": "hostname; DROP TABLE"})
     assert r.status_code == 200
 
@@ -259,7 +259,7 @@ def test_dashboard(client):
 
 
 def test_ip_reverse_search(client):
-    """搜索网卡业务 IP 能反查到设备。"""
+    """Searching a NIC business IP finds the device via reverse lookup"""
     client.post("/api/v1/devices", json=make_push())
     r = client.get("/api/v1/devices", params={"search": "10.10.2.101"})
     assert r.json()["total"] == 1
@@ -279,15 +279,15 @@ def test_tags(client):
     r = client.get("/api/v1/devices", params={"tag": "测试"})
     assert r.json()["total"] == 0
 
-    # 精确匹配:旧实现为子串 LIKE,"生产" 会误命中 "生产基地"
+    # exact match: the old implementation used substring LIKE, "生产" would wrongly match "生产基地"
     client.post("/api/v1/devices", json=make_push(hostname="S1B02DC-VL102"))
     client.put("/api/v1/devices/2/tags", json={"tags": ["生产基地"]})
     r = client.get("/api/v1/devices", params={"tag": "生产"})
-    assert r.json()["total"] == 1  # 只命中标签恰好为 "生产" 的设备
+    assert r.json()["total"] == 1  # only devices whose tag is exactly "生产" match
 
 
 def test_import_csv_preserves_last_pushed_at(client):
-    """回导不倒退 last_pushed_at:unchanged 分支不刷新最后推送时间。"""
+    """Re-import does not backdate last_pushed_at: the unchanged branch does not refresh the last push time"""
     client.post("/api/v1/devices", json=make_push())
     original = client.get("/api/v1/devices/1").json()["last_pushed_at"]
 
@@ -301,7 +301,7 @@ def test_import_csv_preserves_last_pushed_at(client):
 
 
 def test_disk_size_gb_normalized(client):
-    """推送硬盘时 size_gb 归一化:TB 按 1024 换算,GB 原值。"""
+    """Disk push normalizes size_gb: TB converted at 1024, GB kept as-is"""
     push = make_push(
         disks=[
             {"serial_number": "S1", "type": "SSD", "size": 512, "size_unit": "GB"},
@@ -347,7 +347,7 @@ def test_export_csv(client):
 
 
 def test_import_csv_roundtrip(client):
-    """导出的 CSV 直接回导 -> unchanged(格式与导出一致)。"""
+    """Exported CSV re-imported directly -> unchanged (format matches the export)"""
     client.post("/api/v1/devices", json=make_push())
     csv_content = client.get("/api/v1/devices/export/csv").text
 
@@ -375,13 +375,13 @@ def test_import_csv_creates_devices(client):
     body = r.json()
     assert body["created"] == 1
 
-    # 设备 + 标签 + 网卡 IP 已导入
+    # device + tags + NIC IP imported
     detail = client.get("/api/v1/devices/1").json()
     assert detail["hostname"] == "S1C03DC-VL103"
     assert detail["tags"] == ["生产"]
     assert detail["nics"][0]["ips"][0]["ip"] == "10.10.3.103"
 
-    # IP 反查能找到导入的设备
+    # reverse IP lookup finds the imported device
     r = client.get("/api/v1/devices", params={"search": "10.10.3.103"})
     assert r.json()["total"] == 1
 
@@ -400,7 +400,7 @@ def test_import_csv_conflict_goes_to_pending(client):
     body = r.json()
     assert body["diff_created"] == 1
 
-    # 现有数据未变,pending 生成
+    # existing data unchanged, pending created
     assert client.get("/api/v1/devices/1").json()["mgmt_ip"] == "192.168.10.101"
     pendings = client.get("/api/v1/pending-changes").json()["items"]
     assert len(pendings) == 1
@@ -420,12 +420,12 @@ def test_import_csv_skips_malformed_rows(client):
     )
     body = r.json()
     assert body["created"] == 1
-    assert len(body["errors"]) == 1  # 缺 hostname 的行记入 errors
+    assert len(body["errors"]) == 1  # the row missing hostname is recorded in errors
     assert "hostname" in body["errors"][0]
 
 
 def test_spa_fallback(client):
-    """前端路由刷新回退 index.html;未知 API 路径保持 404。"""
+    """Frontend route refresh falls back to index.html; unknown API paths stay 404"""
     r = client.get("/devices")
     assert r.status_code == 200
     assert '<div id="app">' in r.text
@@ -438,7 +438,7 @@ def test_spa_fallback(client):
 
 
 def test_push_memory_and_cpu_end_to_end(client):
-    """带内存/CPU 的推送:created → 详情可见 → �型号 diff → 裁决生效。"""
+    """Push with memory/CPU: created -> visible in detail -> model diff -> resolution applied"""
     push = make_push(
         memory={
             "slots": [
@@ -463,7 +463,7 @@ def test_push_memory_and_cpu_end_to_end(client):
     assert body["memory"][0]["speed_mts"] == 4800
     assert [c["slot"] for c in body["cpus"]] == ["CPU0", "CPU1"]
 
-    # 改 CPU 型号 → diff → 裁决采用新值
+    # change CPU model -> diff -> resolution adopts the new value
     push2 = make_push(
         memory=push["memory"],
         cpus=[
@@ -487,7 +487,7 @@ def test_push_memory_and_cpu_end_to_end(client):
 
 
 def test_push_disk_and_psu_end_to_end(client):
-    """带硬盘/电源的推送:created → 详情可见 → 型号 diff → 裁决生效。"""
+    """Push with disks/PSUs: created -> visible in detail -> model diff -> resolution applied"""
     push = make_push(
         disks=[
             {"serial_number": "123123123", "type": "SSD",
@@ -512,7 +512,7 @@ def test_push_disk_and_psu_end_to_end(client):
     assert body["disks"][0]["size_unit"] == "TB"
     assert [p["serial_number"] for p in body["psus"]] == ["2P0123123132"]
 
-    # 硬盘型号变化 → diff → 裁决采用新值
+    # disk model change -> diff -> resolution adopts the new value
     push2 = make_push(
         disks=[
             {"serial_number": "123123123", "type": "SSD",
@@ -540,14 +540,14 @@ def test_push_disk_and_psu_end_to_end(client):
 
 
 def test_push_open_without_login(guest):
-    """推送接口不鉴权:采集器无需登录即可推送。"""
+    """Push endpoint requires no auth: collectors can push without logging in"""
     r = guest.post("/api/v1/devices", json=make_push())
     assert r.status_code == 200
     assert r.json()["result"] == "created"
 
 
 def test_api_requires_login(guest):
-    """未登录时除推送外的 API 返回 401。"""
+    """Without login, all APIs except push return 401"""
     assert guest.get("/api/v1/devices").status_code == 401
     assert guest.get("/api/v1/dashboard").status_code == 401
     assert guest.get("/api/v1/pending-changes").status_code == 401
@@ -555,14 +555,14 @@ def test_api_requires_login(guest):
 
 
 def test_login_flow(guest):
-    """登录成功签发会话 cookie,可访问受保护接口;错误密码 401。"""
+    """Successful login issues a session cookie granting access to protected APIs; wrong password returns 401"""
     r = guest.post("/api/v1/auth/login", json={"username": "admin", "password": "wrong"})
     assert r.status_code == 401
     assert guest.get("/api/v1/devices").status_code == 401
 
     r = guest.post("/api/v1/auth/login", json={"username": "admin", "password": "admin"})
     assert r.status_code == 200
-    # TestClient 自动携带上一步签发的会话 cookie
+    # TestClient automatically carries the session cookie issued in the previous step
     assert guest.get("/api/v1/devices").status_code == 200
     assert guest.get("/api/v1/auth/me").json()["username"] == "admin"
 
@@ -575,7 +575,7 @@ def _login_as(client, username, password):
 
 
 def test_user_management_crud(client):
-    """admin 新增 viewer 用户,可登录;用户列表/删除正常。"""
+    """admin creates a viewer user who can log in; user list/delete work"""
     r = client.post("/api/v1/users", json={"username": "ops1", "password": "ops123", "role": "viewer"})
     assert r.status_code == 200
     user_id = r.json()["id"]
@@ -583,23 +583,23 @@ def test_user_management_crud(client):
     users = client.get("/api/v1/users").json()["items"]
     assert {u["username"] for u in users} >= {"admin", "ops1"}
 
-    # 新用户可登录
+    # the new user can log in
     assert _login_as(client, "ops1", "ops123").status_code == 200
 
-    # 重置密码(切回 admin 操作)
+    # reset password (switching back to admin)
     assert _login_as(client, "admin", "admin").status_code == 200
     assert client.put(f"/api/v1/users/{user_id}", json={"password": "newpass"}).status_code == 200
     assert _login_as(client, "ops1", "ops123").status_code == 401
     assert _login_as(client, "ops1", "newpass").status_code == 200
     assert _login_as(client, "admin", "admin").status_code == 200
 
-    # 删除
+    # delete
     assert client.delete(f"/api/v1/users/{user_id}").status_code == 200
     assert _login_as(client, "ops1", "newpass").status_code == 401
 
 
 def test_last_admin_protected(client):
-    """不能删除/降级最后一个管理员。"""
+    """The last admin cannot be deleted or demoted"""
     admins = [u for u in client.get("/api/v1/users").json()["items"] if u["role"] == "admin"]
     admin_id = admins[0]["id"]
     assert client.delete(f"/api/v1/users/{admin_id}").status_code == 409
@@ -607,17 +607,17 @@ def test_last_admin_protected(client):
 
 
 def test_viewer_readonly_permissions(client):
-    """viewer 只可查看:裁决/删除/标签/用户管理均 403,GET 正常。"""
+    """viewer is read-only: resolve/delete/tags/user management all 403, GET works"""
     client.post("/api/v1/users", json={"username": "viewer1", "password": "v1pass", "role": "viewer"})
     client.post("/api/v1/devices", json=make_push())
     assert _login_as(client, "viewer1", "v1pass").status_code == 200
 
-    # GET 正常
+    # GET works
     assert client.get("/api/v1/devices").status_code == 200
     assert client.get("/api/v1/dashboard").status_code == 200
     assert client.get("/api/v1/auth/me").json()["role"] == "viewer"
 
-    # 写操作 403
+    # write operations return 403
     assert client.post("/api/v1/pending-changes/1/resolve", json={}).status_code == 403
     assert client.delete("/api/v1/devices/1").status_code == 403
     assert client.post("/api/v1/devices/batch-delete", json={"ids": [1]}).status_code == 403
@@ -627,33 +627,33 @@ def test_viewer_readonly_permissions(client):
 
 
 def test_change_own_password(client):
-    """当前用户修改自己的密码:验证原密码,所有角色可用。"""
+    """Current user changes their own password: verifies the old password, available to all roles"""
     r = client.post("/api/v1/auth/change-password", json={"old_password": "wrong", "new_password": "newpass"})
     assert r.status_code == 401
 
     r = client.post("/api/v1/auth/change-password", json={"old_password": "admin", "new_password": "newpass"})
     assert r.status_code == 200
 
-    # 旧密码失效,新密码可登录
+    # old password no longer works, new password can log in
     assert _login_as(client, "admin", "admin").status_code == 401
     assert _login_as(client, "admin", "newpass").status_code == 200
 
 
 def test_system_settings_read_update(client):
-    """系统设置:GET/PUT,阈值修改后设备状态即时生效。"""
-    # 默认 24 小时
+    """System settings: GET/PUT, device status reacts immediately after a threshold change"""
+    # default is 24 hours
     r = client.get("/api/v1/settings/system")
     assert r.status_code == 200
     assert r.json() == {"offline_threshold_hours": 24}
 
     client.post("/api/v1/devices", json=make_push())
 
-    # 阈值改为 1 小时 -> 2 小时前的推送进入疑似下线
+    # threshold set to 1 hour -> a push from 2 hours ago becomes suspected offline
     r = client.put("/api/v1/settings/system", json={"offline_threshold_hours": 1})
     assert r.status_code == 200
     assert r.json() == {"offline_threshold_hours": 1}
 
-    # 手动把 last_pushed_at 推到 2 小时前 -> 超过 1 小时阈值 -> suspected_offline
+    # manually backdate last_pushed_at by 2 hours -> beyond the 1 hour threshold -> suspected_offline
     from cmdb.database import get_engine_cached
     from cmdb.models import Device
     from sqlmodel import Session as S, select
@@ -668,18 +668,18 @@ def test_system_settings_read_update(client):
     assert r.status_code == 200
     assert r.json()["items"][0]["status"] == "suspected_offline"
 
-    # 阈值改为 72 小时 -> 恢复 active
+    # threshold set to 72 hours -> back to active
     client.put("/api/v1/settings/system", json={"offline_threshold_hours": 72})
     r = client.get("/api/v1/devices")
     assert r.json()["items"][0]["status"] == "active"
 
-    # 非法值 -> 422
+    # invalid value -> 422
     r = client.put("/api/v1/settings/system", json={"offline_threshold_hours": 0})
     assert r.status_code == 422
 
 
 def test_system_settings_viewer_forbidden(client):
-    """viewer 只可读,PUT 返回 403。"""
+    """viewer is read-only, PUT returns 403"""
     client.post(
         "/api/v1/users", json={"username": "viewer1", "password": "v1pass", "role": "viewer"}
     )
@@ -689,17 +689,17 @@ def test_system_settings_viewer_forbidden(client):
 
 
 def test_device_metadata_update(client):
-    """PUT /metadata:机房/机柜位置、负责人、用途,None 不改,空串清空。"""
+    """PUT /metadata: server/rack location, owner, purpose; None keeps the value, empty string clears it"""
     r = client.post("/api/v1/devices", json=make_push())
     device_id = r.json()["device_id"]
 
-    # 默认为空
+    # empty by default
     r = client.get(f"/api/v1/devices/{device_id}")
     assert r.json()["location"] is None
     assert r.json()["owner"] is None
     assert r.json()["purpose"] is None
 
-    # 设置元数据
+    # set metadata
     r = client.put(
         f"/api/v1/devices/{device_id}/metadata",
         json={"location": "A栋-3F-01", "owner": "张三", "purpose": "web 服务"},
@@ -709,12 +709,12 @@ def test_device_metadata_update(client):
     assert r.json()["owner"] == "张三"
     assert r.json()["purpose"] == "web 服务"
 
-    # 推送不改元数据
+    # a push does not change metadata
     client.post("/api/v1/devices", json=make_push())
     r = client.get(f"/api/v1/devices/{device_id}")
     assert r.json()["location"] == "A栋-3F-01"
 
-    # None 不改,空串清空
+    # None keeps the value, empty string clears it
     r = client.put(
         f"/api/v1/devices/{device_id}/metadata",
         json={"location": None, "owner": ""},
@@ -725,27 +725,27 @@ def test_device_metadata_update(client):
     assert r.json()["owner"] is None
     assert r.json()["purpose"] == "web 服务"
 
-    # 不存在的设备 -> 404
+    # nonexistent device -> 404
     r = client.put("/api/v1/devices/99999/metadata", json={"owner": "x"})
     assert r.status_code == 404
 
 
 def test_audit_logs_recorded_and_listed(client):
-    """管理操作记录审计日志,GET /audit-logs 可查且仅 admin。"""
-    # 删除设备 -> 审计
+    """Admin operations are recorded in audit logs, GET /audit-logs is admin-only"""
+    # delete device -> audit
     r = client.post("/api/v1/devices", json=make_push())
     device_id = r.json()["device_id"]
     client.delete(f"/api/v1/devices/{device_id}")
 
-    # 更新标签 -> 审计
+    # update tags -> audit
     r = client.post("/api/v1/devices", json=make_push())
     device_id = r.json()["device_id"]
     client.put(f"/api/v1/devices/{device_id}/tags", json={"tags": ["prod"]})
 
-    # 用户管理 -> 审计
+    # user management -> audit
     client.post("/api/v1/users", json={"username": "u1", "password": "p1pass", "role": "viewer"})
 
-    # 修改设置 -> 审计
+    # update settings -> audit
     client.put("/api/v1/settings/system", json={"offline_threshold_hours": 48})
 
     r = client.get("/api/v1/audit-logs")
@@ -756,19 +756,19 @@ def test_audit_logs_recorded_and_listed(client):
     assert "更新标签" in actions
     assert "创建用户" in actions
     assert "修改系统设置" in actions
-    # 新在前
+    # newest first
     assert actions[0] == "修改系统设置"
-    # 操作人均为登录的 admin
+    # operator is always the logged-in admin
     assert all(i["username"] == "admin" for i in items)
 
-    # 按操作人过滤
+    # filter by operator
     r = client.get("/api/v1/audit-logs?username=admin")
     assert r.status_code == 200
     assert all(i["username"] == "admin" for i in r.json()["items"])
 
 
 def test_audit_logs_viewer_forbidden(client):
-    """viewer 访问审计日志返回 403,且 viewer 的读操作不记审计。"""
+    """viewer gets 403 on audit logs, and viewer read operations are not audited"""
     client.post("/api/v1/users", json={"username": "viewer1", "password": "v1pass", "role": "viewer"})
     assert _login_as(client, "viewer1", "v1pass").status_code == 200
     assert client.get("/api/v1/audit-logs").status_code == 403

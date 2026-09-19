@@ -1,4 +1,4 @@
-"""推送处理:hostname 匹配、创建/unchanged/diff 分支、pending 合并。"""
+"""Push processing: hostname matching, created/unchanged/diff branches, pending merge"""
 
 from datetime import datetime
 
@@ -22,7 +22,7 @@ from cmdb.services.diff import diff_push
 
 
 def build_snapshot(session: Session, device: Device) -> dict:
-    """从 ORM 对象构建设备当前快照,供 diff 使用。"""
+    """Build the device's current snapshot from ORM objects, for use by diff"""
     nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
     snapshot = {
         "serial_number": device.serial_number,
@@ -97,14 +97,14 @@ def ingest_push(
     received_at: datetime,
     update_last_pushed: bool = True,
 ) -> dict:
-    """处理一次推送,返回三分支结果。
+    """Process one push, return the three-branch result:
 
-    - 库中无该 hostname -> created(创建设备+网卡+IP)
-    - 有且无差异        -> unchanged(仅刷新 last_pushed_at)
-    - 有差异            -> diff_created(合并进 pending,不改现有数据)
+    - hostname not in the DB  -> created (create device + nics + IPs)
+    - present with no diff    -> unchanged (only refresh last_pushed_at)
+    - has a diff              -> diff_created (merge into pending, existing data untouched)
 
-    update_last_pushed=False 时 unchanged 分支不刷新 last_pushed_at
-    (CSV 回导等非真实推送场景,避免倒退最后推送时间)。
+    When update_last_pushed=False the unchanged branch does not refresh last_pushed_at
+    (non-real-push scenarios such as CSV re-import, avoiding regressing the last push time)
     """
     device = session.exec(
         select(Device).where(Device.hostname == push.os.hostname)
@@ -140,7 +140,7 @@ def ingest_push(
 
 
 def _create_device(session: Session, push: DevicePush, received_at: datetime) -> Device:
-    """按推送体创建设备 + 全部硬件。"""
+    """Create the device + all hardware from the push body"""
     hw = push.hardware
     device = Device(
         hostname=push.os.hostname,
@@ -187,7 +187,7 @@ def _create_device(session: Session, push: DevicePush, received_at: datetime) ->
 
 
 def _create_nic(session: Session, device_id: int, nic) -> None:
-    """创建单块网卡及其 IP 列表。"""
+    """Create a single nic and its IP list"""
     row = Nic(device_id=device_id, name=nic.name, mac=nic.mac)
     session.add(row)
     session.flush()
@@ -198,10 +198,10 @@ def _create_nic(session: Session, device_id: int, nic) -> None:
 def _merge_into_pending(
     session: Session, device: Device, push: DevicePush, diff: dict
 ) -> PendingChange:
-    """挂到该设备已有的 pending(始终一条),否则新建。
+    """Attach to the device's existing pending (always one), otherwise create a new one
 
-    已有 pending 未裁决时以最新一次推送为准:直接用新推送算出的 diff
-    整体替换(库中数据在裁决前不动,重算即最新视角),不与旧 diff 累计。
+    When an existing pending is unresolved, the latest push wins: the diff computed from the new push
+    replaces the old one wholesale (DB data is untouched before resolution, recomputing gives the latest view), never accumulated with the old diff
     """
     pending = session.exec(
         select(PendingChange).where(

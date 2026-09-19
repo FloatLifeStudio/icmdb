@@ -1,4 +1,4 @@
-"""裁决应用服务测试:字段选择、网卡增删改、change_history。"""
+"""Resolution application service tests: field choices, NIC add/remove/change, change_history"""
 
 from datetime import datetime
 from sqlmodel import Session, select
@@ -23,7 +23,7 @@ RECEIVED_AT = datetime(2026, 9, 11, 15, 30, 0)
 
 
 def make_push(**overrides) -> DevicePush:
-    """构造新格式推送体(2 块网卡),可按字段覆盖;旧键名自动映射到新结构。"""
+    """Build a new-format push payload (2 NICs), overridable per field; legacy keys map onto the new structure"""
     base = {
         "agent": {"source": "collector", "full_sync": True},
         "os": {"hostname": "S1A01DC-VL101"},
@@ -42,7 +42,7 @@ def make_push(**overrides) -> DevicePush:
             ],
         },
     }
-    # 便捷覆盖:旧键名映射到新结构
+    # convenience overrides: legacy keys map onto the new structure
     for key in ("nics", "memory", "cpus", "disks", "psus"):
         if key in overrides:
             base["hardware"][key] = overrides.pop(key)
@@ -57,12 +57,12 @@ def make_push(**overrides) -> DevicePush:
     hostname = overrides.pop("hostname", None)
     if hostname:
         base["os"]["hostname"] = hostname
-    base.update(overrides)  # mgmt 等同名字段直接覆盖
+    base.update(overrides)  # same-name fields like mgmt override directly
     return DevicePush(**base)
 
 
 def setup_conflict(session: Session, **push_overrides) -> PendingChange:
-    """先创建设备,再推一次有差异的数据,返回待裁决记录。"""
+    """Create the device first, then push data with differences, return the pending change"""
     ingest_push(session, make_push(), RECEIVED_AT)
     result = ingest_push(session, make_push(**push_overrides), RECEIVED_AT)
     assert result["result"] == "diff_created"
@@ -79,8 +79,8 @@ def test_apply_field_choice_new(engine):
 
         assert result["applied"] == ["mgmt.ip: 192.168.10.101 -> 192.168.10.200"]
         device = session.get(Device, pending.device_id)
-        assert device.mgmt_ip == "192.168.10.200"  # 新值生效
-        assert device.serial_number == "PF4ABC123456"  # 未选择的保持不变
+        assert device.mgmt_ip == "192.168.10.200"  # new value applied
+        assert device.serial_number == "PF4ABC123456"  # unselected fields unchanged
         assert pending.status == "applied"
         assert pending.resolved_at is not None
         histories = session.exec(select(ChangeHistory)).all()
@@ -97,7 +97,7 @@ def test_apply_field_choice_old_keeps_current(engine):
         )
         result = apply_resolution(session, pending, {"mgmt.ip": "old"}, {})
 
-        assert result["applied"] == []  # 保留现状,无生效改动
+        assert result["applied"] == []  # current state kept, no applied changes
         device = session.get(Device, pending.device_id)
         assert device.mgmt_ip == "192.168.10.101"
         assert session.exec(select(ChangeHistory)).all() == []
@@ -137,7 +137,7 @@ def test_apply_nic_removed(engine):
         assert result["applied"] == ["网卡 eth1 删除"]
         device = session.get(Device, pending.device_id)
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
-        assert [n.name for n in nics] == ["eth0"]  # eth1 连带 IP 已删
+        assert [n.name for n in nics] == ["eth0"]  # eth1 and its IPs deleted
         ips = session.exec(select(NicIP)).all()
         assert [ip.ip for ip in ips] == ["10.10.1.101"]
 
@@ -153,7 +153,7 @@ def test_apply_nic_changed(engine):
         ])
         result = apply_resolution(session, pending, {}, {"eth0": "new"})
 
-        assert len(result["applied"]) == 2  # mac + ips 两条
+        assert len(result["applied"]) == 2  # mac + ips entries
         device = session.get(Device, pending.device_id)
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
         eth0 = next(n for n in nics if n.name == "eth0")
@@ -163,7 +163,7 @@ def test_apply_nic_changed(engine):
 
 
 def test_apply_mixed_choices(engine):
-    """主机字段选新、网卡候删保留,混合裁决。"""
+    """Host field set to new, removal candidate kept: mixed resolution"""
     with Session(engine) as session:
         pending = setup_conflict(session, nics=[
             {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
@@ -173,15 +173,15 @@ def test_apply_mixed_choices(engine):
                                   {"eth1": "old"})
 
         device = session.get(Device, pending.device_id)
-        assert device.serial_number == "PF4ABC123456"  # 与库中相同,选择 new 无实际变化
+        assert device.serial_number == "PF4ABC123456"  # same as in db, choosing new has no real change
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
-        assert len(nics) == 2  # eth1 保留
+        assert len(nics) == 2  # eth1 kept
         assert result["applied"] == []
         assert session.exec(select(ChangeHistory)).all() == []
 
 
 def test_history_kept_after_device_delete(engine):
-    """设备硬删后 change_history 保留(先删 FK 子表,再删设备)。"""
+    """change_history survives a hard device delete (delete FK child tables first, then the device)"""
     with Session(engine) as session:
         pending = setup_conflict(
             session, mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
@@ -194,21 +194,21 @@ def test_history_kept_after_device_delete(engine):
         for nic in nics:
             for nip in session.exec(select(NicIP).where(NicIP.nic_id == nic.id)).all():
                 session.delete(nip)
-        session.flush()  # 先删 nic_ips
+        session.flush()  # delete nic_ips first
         for nic in nics:
             session.delete(nic)
-        session.flush()  # 再删 nic
+        session.flush()  # then delete nics
         for p in session.exec(
             select(PendingChange).where(PendingChange.device_id == device.id)
         ).all():
             session.delete(p)
-        session.flush()  # 再删 pending
+        session.flush()  # then delete pendings
         session.delete(device)
         session.commit()
 
         histories = session.exec(select(ChangeHistory)).all()
-        assert len(histories) == 1  # 历史仍在
-        assert session.exec(select(PendingChange)).all() == []  # pending 已删
+        assert len(histories) == 1  # history still there
+        assert session.exec(select(PendingChange)).all() == []  # pendings deleted
 
 
 def memory_slots(*slots) -> dict:
@@ -287,7 +287,7 @@ def test_apply_memory_changed(engine):
         mem = session.exec(select(MemorySlot)).one()
         assert mem.part_number == "PN-B"
         assert mem.size_gb == 32
-        assert mem.serial_number == "111"  # 未变化的保持不变
+        assert mem.serial_number == "111"  # unchanged fields kept
 
 
 def test_apply_cpu_added_and_changed(engine):
@@ -312,7 +312,7 @@ def test_apply_cpu_added_and_changed(engine):
         apply_resolution(session, pending, {}, {}, {}, {"CPU1": "new"})
         assert len(session.exec(select(Cpu)).all()) == 2
 
-        # 型号变化
+        # model change
         result = ingest_push(
             session,
             make_push(
@@ -343,7 +343,7 @@ def disks(*specs) -> list[dict]:
 
 def test_apply_disk_added_removed_and_changed(engine):
     with Session(engine) as session:
-        # 新增
+        # added
         ingest_push(
             session,
             make_push(disks=disks(
@@ -363,7 +363,7 @@ def test_apply_disk_added_removed_and_changed(engine):
         assert result["applied"] == ["硬盘 SN2 新增"]
         assert [d.serial_number for d in session.exec(select(Disk)).all()] == ["SN1", "SN2"]
 
-        # 型号变化
+        # model change
         result = ingest_push(
             session,
             make_push(disks=disks(
@@ -376,7 +376,7 @@ def test_apply_disk_added_removed_and_changed(engine):
         result = apply_resolution(session, pending, {}, {}, {}, {}, {"SN1": "new"})
         assert result["applied"] == ["硬盘 SN1 model: 990EVO -> 990PRO"]
 
-        # full_sync 少一块 → 候删
+        # one disk fewer with full_sync -> removal candidate
         result = ingest_push(
             session,
             make_push(disks=disks(("SN1", "SSD", "Samsung", "990PRO", 8, "TB"))),
@@ -413,7 +413,7 @@ def test_apply_psu_added_and_changed(engine):
         assert result["applied"] == ["电源 PSN2 新增"]
         assert len(session.exec(select(Psu)).all()) == 2
 
-        # 功率变化
+        # power change
         result = ingest_push(
             session,
             make_push(psus=[
@@ -453,7 +453,7 @@ def test_gpu_added_removed_and_changed(engine):
         )
         assert len(session.exec(select(Gpu)).all()) == 2
 
-        # full_sync 少一块 → 候删
+        # one GPU fewer with full_sync -> removal candidate
         result = ingest_push(
             session,
             make_push(gpus=gpus(("GPU-A", "H100", "SN1", 80, "0000:1B:00.0"))),
@@ -467,7 +467,7 @@ def test_gpu_added_removed_and_changed(engine):
         assert result["applied"] == ["GPU GPU-B 删除"]
         assert [g.uuid for g in session.exec(select(Gpu)).all()] == ["GPU-A"]
 
-        # 驱动版本变化 → changed
+        # driver version change -> changed
         result = ingest_push(
             session,
             make_push(gpus=gpus(

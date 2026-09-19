@@ -1,11 +1,11 @@
-"""字段级 diff 服务测试。"""
+"""Field-level diff service tests"""
 
 from cmdb.schemas import DevicePush, MgmtInfo, NicIPIn, NicIn
 from cmdb.services.diff import diff_push
 
 
 def make_push(**overrides) -> DevicePush:
-    """构造新格式推送体,可按字段覆盖;旧键名自动映射到新结构。"""
+    """Build a new-format push payload, overridable per field; legacy keys map onto the new structure"""
     base = {
         "agent": {"source": "collector", "full_sync": True},
         "os": {"hostname": "S1A01DC-VL101"},
@@ -20,7 +20,7 @@ def make_push(**overrides) -> DevicePush:
             ],
         },
     }
-    # 便捷覆盖:旧键名映射到新结构
+    # convenience overrides: legacy keys map onto the new structure
     for key in ("nics", "memory", "cpus", "disks", "psus"):
         if key in overrides:
             base["hardware"][key] = overrides.pop(key)
@@ -35,12 +35,12 @@ def make_push(**overrides) -> DevicePush:
     hostname = overrides.pop("hostname", None)
     if hostname:
         base["os"]["hostname"] = hostname
-    base.update(overrides)  # mgmt 等同名字段直接覆盖
+    base.update(overrides)  # same-name fields like mgmt override directly
     return DevicePush(**base)
 
 
 def make_snapshot() -> dict:
-    """与 make_push 一致的库中快照。"""
+    """Database snapshot consistent with make_push"""
     return {
         "serial_number": "PF4ABC123456",
         "mgmt_mac": "AA:BB:CC:DD:EE:01",
@@ -73,7 +73,7 @@ def test_host_field_diff():
 
 
 def test_pushed_none_field_skipped():
-    """推送体缺 serial_number 视为未采集,不产生 diff、不清空数据。"""
+    """A push missing serial_number is treated as not collected: no diff, no data cleared"""
     push = make_push(serial_number=None)
     diff = diff_push(make_snapshot(), push)
     assert diff["has_changes"] is False
@@ -108,7 +108,7 @@ def test_nic_changed_mac():
     assert eth0["changes"] == [
         {"field": "mac", "old": "AA:BB:CC:DD:EE:02", "new": "AA:BB:CC:DD:EE:99"}
     ]
-    # changed 条目带整体旧/新表示,前端两列对比用
+    # changed entries carry whole old/new representations for the frontend two-column view
     assert eth0["old"] == {
         "name": "eth0",
         "mac": "AA:BB:CC:DD:EE:02",
@@ -134,7 +134,7 @@ def test_nic_changed_ips():
 
 
 def test_nic_removed_only_with_full_sync():
-    """full_sync=true 时库中多出的网卡进候删;false 时保持不动。"""
+    """With full_sync=true, extra NICs in the database become removal candidates; with false they are left untouched"""
     push = make_push(nics=[NicIn(name="eth0", mac="AA:BB:CC:DD:EE:02",
                                  ips=[NicIPIn(ip="10.10.1.101", prefix_length=24)])])
 

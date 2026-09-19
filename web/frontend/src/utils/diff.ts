@@ -1,9 +1,9 @@
-// diff 展示共享工具:字段中文映射、值格式化
-// 被 ConflictResolve / DiffEntry / DiffDetail 使用
+// Shared diff display utilities: field label mapping and value formatting
+// Used by ConflictResolve / DiffEntry / DiffDetail
 
-// 字段路径 -> 人类可读名称(主机字段带路径,硬件条目字段为裸键)
+// Field path -> human-readable name (host fields use dotted paths, hardware entry fields are bare keys)
 const FIELD_LABELS: Record<string, string> = {
-  // 主机字段
+  // Host fields
   hostname: '主机名',
   'hardware.chassis_serial_number': '序列号',
   serial_number: '序列号',
@@ -14,11 +14,11 @@ const FIELD_LABELS: Record<string, string> = {
   'mgmt.mac': '管理 MAC',
   'mgmt.ip': '管理 IP',
   'mgmt.prefix_length': '子网前缀',
-  // 网卡条目
+  // NIC entry fields
   name: '网卡',
   mac: 'MAC',
   ips: 'IP 列表',
-  // 内存条目
+  // Memory entry fields
   slot: '槽位',
   manufacturer: '厂商',
   part_number: '型号颗粒',
@@ -26,10 +26,10 @@ const FIELD_LABELS: Record<string, string> = {
   size: '容量',
   size_unit: '容量单位',
   speed_mts: '频率',
-  // CPU / 硬盘 / 电源条目
+  // CPU / disk / PSU entry fields
   model: '型号',
   max_power_w: '最大功率',
-  // GPU 条目
+  // GPU entry fields
   uuid: 'UUID',
   driver_version: '驱动版本',
   pcie_id: 'PCIe',
@@ -39,7 +39,7 @@ export function fieldLabel(f: string): string {
   return FIELD_LABELS[f] ?? f
 }
 
-// IP 列表值: [{ip, prefix_length}] -> "10.0.0.1/24, 10.0.0.2"
+// IP list value: [{ip, prefix_length}] -> "10.0.0.1/24, 10.0.0.2"
 function fmtIps(v: unknown): string {
   const list = (v as { ip: string; prefix_length: number | null }[] | null) || []
   return list.length
@@ -47,20 +47,20 @@ function fmtIps(v: unknown): string {
     : '无'
 }
 
-// 单值格式化:diff 行的旧值/新值展示
+// Single value formatting: old/new value display for diff rows
 export function fmtValue(field: string, v: unknown): string {
   if (v === null || v === undefined || v === '') return '-'
   if (field === 'ips') return fmtIps(v)
   return String(v)
 }
 
-// added/removed 条目的完整对象 -> 键值行(跳过空值,size_unit 并入 size)
+// Full object of added/removed entries -> key-value rows (skip empty values, fold size_unit into size)
 export function fullRows(obj: Record<string, unknown> | null): { key: string; label: string; value: string }[] {
   if (!obj) return []
   const rows: { key: string; label: string; value: string }[] = []
   for (const [k, v] of Object.entries(obj)) {
     if (v === null || v === undefined || v === '') continue
-    if (k === 'size_unit') continue // 并入容量展示
+    if (k === 'size_unit') continue // folded into size display
     if (k === 'size') {
       rows.push({ key: k, label: fieldLabel(k), value: `${v}${obj.size_unit ?? ''}` })
       continue

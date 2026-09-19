@@ -1,4 +1,4 @@
-"""操作审计日志 API:仅 admin(中间件按路径拦截,此处再做角色校验)。"""
+"""Audit log API: admin only (the middleware gates by path, here the role is checked again)"""
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
@@ -17,7 +17,7 @@ def list_audit_logs(
     limit: int = 100,
     session: Session = Depends(get_session),
 ):
-    """审计日志列表(新在前,可选按操作人过滤)。"""
+    """Audit log list (newest first, optional filter by operator)"""
     me = current_username(request)
     user = session.exec(select(User).where(User.username == me)).first() if me else None
     if user is None or user.role != "admin":

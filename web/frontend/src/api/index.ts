@@ -1,4 +1,4 @@
-// API client 封装:统一错误处理,REST 风格
+// API client wrapper: unified error handling, REST style
 const BASE = '/api/v1'
 
 export interface NicIPOut {
@@ -205,7 +205,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    // 会话失效:除登录/会话检查外,401 统一跳登录页
+    // Session expired: except for login/session check, any 401 redirects to the login page
     if (
       res.status === 401 &&
       !url.startsWith(`${BASE}/auth/`) &&

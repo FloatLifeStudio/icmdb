@@ -60,13 +60,13 @@ const stats = ref<DashboardOut | null>(null)
 const loading = ref(false)
 const tableRef = ref<TableInstance>()
 
-// 点击行任意位置展开/收起明细(设备列的链接点击除外)
+// Click anywhere on a row to expand/collapse details (except clicks on the device column link)
 function toggleExpand(row: HistoryRow, _column: unknown, event: Event) {
   if ((event.target as HTMLElement).closest('a')) return
   tableRef.value?.toggleRowExpansion(row)
 }
 
-// 变更内容概览:只写大类(如 内存,CPU),完整明细在展开行
+// Change content digest: only major categories (e.g. memory, CPU), full details in the expanded row
 function digest(row: HistoryRow): string {
   const diff = row.diff as
     | {

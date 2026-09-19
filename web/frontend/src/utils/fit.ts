@@ -1,5 +1,5 @@
-// 列宽自适应:用 canvas 测量文本实际宽度,让列默认宽到刚好放下最长内容。
-// 用法:数据加载后按列定义算出 min-width 表,模板里 :min-width="widths.xxx"。
+// Column width auto-fit: measure actual text width with canvas so the default column width just fits the longest content
+// Usage: after data loads, compute the min-width map from column definitions, then use :min-width="widths.xxx" in the template
 
 let ctx: CanvasRenderingContext2D | null = null
 
@@ -7,7 +7,7 @@ const FONT =
   '14px "Helvetica Neue", Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif'
 const BOLD_FONT = `bold ${FONT}`
 
-// cell 左右 padding 24px + 边框与测量余量
+// cell left/right padding 24px plus border and measurement margin
 const PAD = 30
 
 function measure(text: string, font: string): number {
@@ -23,7 +23,7 @@ export function textWidth(text: string): number {
   return measure(text, FONT)
 }
 
-// 多行文本取最宽的一行(行内各自换行显示时,列宽只需放下最长行)
+// Take the widest line of multi-line text (when lines wrap individually, the column only needs to fit the longest line)
 export function longestLine(lines: string[]): string {
   return lines.reduce(
     (longest, line) => (textWidth(line) > textWidth(longest) ? line : longest),
@@ -34,7 +34,7 @@ export function longestLine(lines: string[]): string {
 export interface FitCol<R> {
   key: string
   label: string
-  // 自定义取值(默认取 String(row[key]));渲染为 '-' 的列传 text 返回 '-'
+  // Custom value getter (defaults to String(row[key])); for columns rendered as '-', text returns '-'
   text?: (row: R) => string
 }
 
@@ -42,7 +42,7 @@ function valueAt(row: unknown, key: string): unknown {
   return (row as Record<string, unknown>)[key]
 }
 
-// 算各列 min-width:列头(粗体)与该列所有行取值中最宽者 + padding
+// Compute each column's min-width: widest of the bold header and all row values in that column, plus padding
 export function fitMinWidths<R>(
   rows: readonly R[],
   cols: FitCol<R>[],

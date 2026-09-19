@@ -270,7 +270,7 @@ const tagInput = ref('')
 const metaInput = ref({ location: '', owner: '', purpose: '' })
 const historyTable = ref<TableInstance>()
 
-// 列宽自适应:按各列最长内容算 min-width,默认刚好放下、完整显示
+// Column width auto-fit: compute min-width from the longest content per column, fully visible by default
 const memoryWidths = computed(() =>
   fitMinWidths(device.value?.memory ?? [], [
     { key: 'slot', label: '槽位' },
@@ -315,12 +315,12 @@ const gpuWidths = computed(() =>
   ])
 )
 
-// 点击行任意位置展开/收起明细
+// Click anywhere on a row to expand/collapse details
 function toggleExpand(row: HistoryRow) {
   historyTable.value?.toggleRowExpansion(row)
 }
 
-// 变更内容概览:只写大类(如 内存,CPU),完整明细在展开行
+// Change content digest: only major categories (e.g. memory, CPU), full details in the expanded row
 function digest(row: HistoryRow): string {
   const diff = row.diff as
     | {
@@ -347,7 +347,7 @@ function digest(row: HistoryRow): string {
 
 function fmt(ts: string | null): string {
   if (!ts) return '-'
-  // 后端存 naive UTC,补 Z 标记后由浏览器转换为查看者本地时区
+  // Backend stores naive UTC, append a Z marker and let the browser convert to the viewer's local timezone
   const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z'
   return new Date(utc).toLocaleString()
 }
@@ -398,7 +398,7 @@ async function load() {
 async function loadHistory() {
   historyLoading.value = true
   try {
-    // 历史按设备过滤:全量拉取后前端过滤(含已删设备的历史)
+    // History filtered by device: fetch all then filter on the frontend (includes history of deleted devices)
     const res = await fetch('/api/v1/change-history?device_id=' + deviceId)
     if (res.ok) {
       history.value = (await res.json()).items

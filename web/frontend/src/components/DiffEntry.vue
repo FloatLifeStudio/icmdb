@@ -14,7 +14,7 @@
       </el-radio-group>
     </div>
     <div class="entry-body">
-      <!-- changed:身份上下文(未变化字段,确认是不是同一硬件)+ 变化字段红绿对比 -->
+      <!-- changed: identity context (unchanged fields, to confirm it is the same hardware) + red/green diff of changed fields -->
       <template v-if="entry.kind === 'changed'">
         <div v-if="contextRows.length" class="context-row">
           <span class="context-text">{{ contextRows.map((r) => r.value).join(' · ') }}</span>
@@ -29,7 +29,7 @@
           <span class="empty">-</span>
         </div>
       </template>
-      <!-- added/removed:整条键值对展示 -->
+      <!-- added/removed: full key-value display -->
       <template v-else>
         <div v-for="(row, i) in rows" :key="i" class="change-row">
           <span class="fname">{{ row.label }}</span>
@@ -53,11 +53,11 @@ type Entry = {
 
 const props = defineProps<{
   entry: Entry
-  // 条目身份(网卡名/槽位/SN/UUID),条目头展示
+  // Entry identity (NIC name/slot/SN/UUID), shown in the entry header
   identity: string
-  // 类别名(网卡/内存/CPU...),用于采用/保留文案
+  // Category noun (NIC/memory/CPU...), used in keep/adopt wording
   noun: string
-  // 裁决选择 old/new(v-model);undefined 时隐藏(无身份条目)
+  // Resolution choice old/new (v-model); hidden when undefined (entries without identity)
   modelValue?: string
   isAdmin?: boolean
 }>()
@@ -90,8 +90,8 @@ const rows = computed(() =>
   fullRows((props.entry.kind === 'added' ? props.entry.new : props.entry.old) as Record<string, unknown> | null)
 )
 
-// changed 条目的身份上下文:旧对象中未变化的字段(SN/厂商/型号等),
-// 用于确认"是同一硬件的变化"——没有 SN 上下文就无法确认变化可信
+// Identity context of a changed entry: unchanged fields from the old object (SN/manufacturer/model etc)
+// used to confirm "a change to the same hardware" — without SN context the change cannot be trusted
 const contextRows = computed(() => {
   if (props.entry.kind !== 'changed') return []
   const changedFields = new Set((props.entry.changes ?? []).map((c) => c.field))

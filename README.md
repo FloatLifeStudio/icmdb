@@ -66,6 +66,7 @@ uv run pytest tests/ -v
 
 ## 文档
 
+- English documentation: [README.en.md](README.en.md) / [docs/en/](docs/en/)
 - 全景文档(数据库/接口/推送 JSON 详解与设计评审):[docs/OVERVIEW.md](docs/OVERVIEW.md)
 - API 使用文档:[docs/API.md](docs/API.md)
 - 示例数据文档:[docs/EXAMPLE.md](docs/EXAMPLE.md)

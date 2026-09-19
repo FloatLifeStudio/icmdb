@@ -16,7 +16,7 @@ const router = createRouter({
   ],
 })
 
-// 路由守卫:未登录跳登录页;用户管理/系统设置仅 admin(会话状态每次会话首次导航时向后端确认)
+// Route guard: unauthenticated users go to the login page; user management/system settings are admin-only (session state is confirmed with the backend on each session's first navigation)
 let sessionChecked = false
 router.beforeEach(async (to) => {
   if (to.path === '/login') return true
