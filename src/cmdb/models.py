@@ -203,3 +203,12 @@ class User(SQLModel, table=True):
     password_hash: str
     role: str = Field(default="viewer", index=True)  # admin | viewer
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class SystemSetting(SQLModel, table=True):
+    """系统设置键值存储(UI 可在线修改,环境变量作默认值)。"""
+
+    id: int | None = Field(default=None, primary_key=True)
+    key: str = Field(unique=True, index=True)
+    value: str
+    updated_at: datetime = Field(default_factory=utcnow)

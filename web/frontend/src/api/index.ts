@@ -180,6 +180,10 @@ export interface UserInfo {
   created_at: string
 }
 
+export interface SystemSettings {
+  offline_threshold_hours: number
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
   if (!res.ok) {
@@ -285,4 +289,9 @@ export const api = {
     request<UserInfo>(`${BASE}/users/${id}`, json('PUT', body)),
 
   deleteUser: (id: number) => request<{ ok: boolean }>(`${BASE}/users/${id}`, { method: 'DELETE' }),
+
+  getSystemSettings: () => request<SystemSettings>(`${BASE}/settings/system`),
+
+  updateSystemSettings: (body: SystemSettings) =>
+    request<SystemSettings>(`${BASE}/settings/system`, json('PUT', body)),
 }

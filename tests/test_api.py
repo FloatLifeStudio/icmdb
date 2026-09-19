@@ -637,3 +637,52 @@ def test_change_own_password(client):
     # 旧密码失效,新密码可登录
     assert _login_as(client, "admin", "admin").status_code == 401
     assert _login_as(client, "admin", "newpass").status_code == 200
+
+
+def test_system_settings_read_update(client):
+    """系统设置:GET/PUT,阈值修改后设备状态即时生效。"""
+    # 默认 24 小时
+    r = client.get("/api/v1/settings/system")
+    assert r.status_code == 200
+    assert r.json() == {"offline_threshold_hours": 24}
+
+    client.post("/api/v1/devices", json=make_push())
+
+    # 阈值改为 1 小时 -> 2 小时前的推送进入疑似下线
+    r = client.put("/api/v1/settings/system", json={"offline_threshold_hours": 1})
+    assert r.status_code == 200
+    assert r.json() == {"offline_threshold_hours": 1}
+
+    # 手动把 last_pushed_at 推到 2 小时前 -> 超过 1 小时阈值 -> suspected_offline
+    from cmdb.database import get_engine_cached
+    from cmdb.models import Device
+    from sqlmodel import Session as S, select
+
+    engine = get_engine_cached()
+    with S(engine) as s:
+        device = s.exec(select(Device)).first()
+        device.last_pushed_at = utcnow() - timedelta(hours=2)
+        s.add(device)
+        s.commit()
+    r = client.get("/api/v1/devices")
+    assert r.status_code == 200
+    assert r.json()["items"][0]["status"] == "suspected_offline"
+
+    # 阈值改为 72 小时 -> 恢复 active
+    client.put("/api/v1/settings/system", json={"offline_threshold_hours": 72})
+    r = client.get("/api/v1/devices")
+    assert r.json()["items"][0]["status"] == "active"
+
+    # 非法值 -> 422
+    r = client.put("/api/v1/settings/system", json={"offline_threshold_hours": 0})
+    assert r.status_code == 422
+
+
+def test_system_settings_viewer_forbidden(client):
+    """viewer 只可读,PUT 返回 403。"""
+    client.post(
+        "/api/v1/users", json={"username": "viewer1", "password": "v1pass", "role": "viewer"}
+    )
+    assert _login_as(client, "viewer1", "v1pass").status_code == 200
+    assert client.get("/api/v1/settings/system").status_code == 200
+    assert client.put("/api/v1/settings/system", json={"offline_threshold_hours": 48}).status_code == 403

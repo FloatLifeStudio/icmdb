@@ -18,8 +18,9 @@
 - [仪表盘](#5-仪表盘)
 - [设备扩展接口](#6-设备扩展接口)
 - [错误码](#7-错误码)
-- [用户登录](#8-用户登录)
-- [用户管理](#9-用户管理)
+- [系统设置](#8-系统设置)
+- [用户登录](#9-用户登录)
+- [用户管理](#10-用户管理)
 
 ---
 
@@ -454,7 +455,20 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 
 错误响应:`{"detail": "..."}`(FastAPI 校验错误为 `{"detail": [...]}`)。
 
-## 8. 用户登录
+## 8. 系统设置
+
+键值存储于 systemsetting 表,环境变量作默认值;修改后设备状态按新阈值即时计算。
+
+### `GET /api/v1/settings/system`
+
+返回 `{"offline_threshold_hours": 24}`(疑似下线阈值,小时)。
+
+### `PUT /api/v1/settings/system`
+
+仅 admin(其他用户 403)。请求体 `{"offline_threshold_hours": 24}`,取值 1 ~ 8760;
+非法值 422。
+
+## 9. 用户登录
 
 用户账号存 users 表(PBKDF2 哈希),首个 admin 账号由 `CMDB_ADMIN_USER` /
 `CMDB_ADMIN_PASSWORD`(默认 `admin` / `admin`)在首次启动时种子创建。
@@ -490,7 +504,7 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 返回当前登录用户与角色 `{"username": "admin", "role": "admin"}`;未登录返回 401
 (UI 用它判断会话状态)。
 
-## 9. 用户管理
+## 10. 用户管理
 
 仅 admin 可访问(其他用户返回 403)。角色两级:`admin`(可操作)与 `viewer`(只可查看)。
 首个 admin 账号由 `CMDB_ADMIN_USER` / `CMDB_ADMIN_PASSWORD` 在首次启动时种子创建;
@@ -535,7 +549,7 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
 | `CMDB_DB_PATH` | `cmdb.db` | SQLite 数据库文件路径 |
-| `CMDB_OFFLINE_THRESHOLD_DAYS` | `3` | 疑似下线阈值(天) |
+| `CMDB_OFFLINE_THRESHOLD_DAYS` | `1` | 疑似下线阈值(天),仅作系统设置的初始默认值 |
 | `CMDB_STATIC_DIR` | `src/cmdb/static` | 前端构建产物目录 |
 | `CMDB_ADMIN_USER` | `admin` | 登录用户名 |
 | `CMDB_ADMIN_PASSWORD` | `admin` | 登录密码 |

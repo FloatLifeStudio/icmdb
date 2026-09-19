@@ -10,7 +10,6 @@ from pydantic import ValidationError
 from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
-from cmdb.config import settings
 from cmdb.database import get_session
 from cmdb.models import (
     Cpu,
@@ -48,6 +47,7 @@ from cmdb.schemas import (
     TagUpdate,
     normalise_legacy,
 )
+from cmdb.api.settings import get_offline_threshold_hours
 from cmdb.services.ingest import ingest_push
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -58,11 +58,15 @@ _SORTABLE = {"hostname", "serial_number", "mgmt_ip", "last_pushed_at"}
 _Children = dict
 
 
-def _device_status(device: Device) -> str:
+def _offline_threshold(session: Session) -> timedelta:
+    """疑似下线阈值:DB 系统设置优先,回退环境变量。"""
+    return timedelta(hours=get_offline_threshold_hours(session))
+
+
+def _device_status(device: Device, threshold: timedelta) -> str:
     """动态计算状态:超阈值未推送标记疑似下线。"""
     if device.last_pushed_at is None:
         return "suspected_offline"
-    threshold = timedelta(days=settings.offline_threshold_days)
     if utcnow() - device.last_pushed_at > threshold:
         return "suspected_offline"
     return "active"
@@ -186,7 +190,12 @@ def _delete_device_children(session: Session, device_id: int) -> None:
     session.flush()
 
 
-def _to_out(session: Session, device: Device, children: _Children | None = None) -> DeviceOut:
+def _to_out(
+    session: Session,
+    device: Device,
+    children: _Children | None = None,
+    threshold: timedelta | None = None,
+) -> DeviceOut:
     """Device + 子表数据 -> DeviceOut(含动态状态)。
 
     children 由 _load_children 批量加载;单台设备时可省略(内部补一次)。
@@ -221,7 +230,7 @@ def _to_out(session: Session, device: Device, children: _Children | None = None)
         last_pushed_at=device.last_pushed_at,
         created_at=device.created_at,
         updated_at=device.updated_at,
-        status=_device_status(device),
+        status=_device_status(device, threshold or _offline_threshold(session)),
         tags=children["tags"].get(device.id, []),
         nics=nic_outs,
         memory=[
@@ -319,7 +328,7 @@ def list_devices(
         tagged_ids = select(DeviceTag.device_id).where(DeviceTag.name == tag)
         query = query.where(Device.id.in_(tagged_ids))
     if status in ("active", "suspected_offline"):
-        cutoff = utcnow() - timedelta(days=settings.offline_threshold_days)
+        cutoff = utcnow() - _offline_threshold(session)
         if status == "suspected_offline":
             query = query.where(
                 or_(Device.last_pushed_at.is_(None), Device.last_pushed_at < cutoff)
@@ -340,7 +349,8 @@ def list_devices(
     ).all()
     # 子表批量加载(每类一次 IN 查询),避免每台设备反复查询
     children = _load_children(session, [d.id for d in devices])
-    items = [_to_out(session, d, children) for d in devices]
+    threshold = _offline_threshold(session)
+    items = [_to_out(session, d, children, threshold) for d in devices]
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
@@ -437,7 +447,7 @@ def export_csv(session: Session = Depends(get_session)):
                 d.mgmt_ip or "",
                 d.mgmt_prefix_length if d.mgmt_prefix_length is not None else "",
                 ",".join(_device_tags_by_id(session, d.id)),
-                _device_status(d),
+                _device_status(d, _offline_threshold(session)),
                 d.last_pushed_at.isoformat() if d.last_pushed_at else "",
                 " | ".join(nic_parts),
                 " | ".join(gpu_parts),

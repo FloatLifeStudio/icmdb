@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
-from cmdb.api.devices import _device_status
+from cmdb.api.devices import _device_status, _offline_threshold
 from cmdb.database import get_session
 from cmdb.models import ChangeHistory, Device, PendingChange
 from sqlmodel import select
@@ -15,7 +15,8 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 def dashboard(session: Session = Depends(get_session)):
     """资产概览:总数、活跃/疑似下线、待裁决数、最近变更。"""
     devices = session.exec(select(Device)).all()
-    active = sum(1 for d in devices if _device_status(d) == "active")
+    threshold = _offline_threshold(session)
+    active = sum(1 for d in devices if _device_status(d, threshold) == "active")
     pending = session.exec(
         select(PendingChange).where(PendingChange.status == "pending")
     ).all()

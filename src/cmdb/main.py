@@ -15,6 +15,7 @@ from cmdb.api.dashboard import router as dashboard_router
 from cmdb.api.devices import router as devices_router
 from cmdb.api.history import router as history_router
 from cmdb.api.pending_changes import router as pending_changes_router
+from cmdb.api.settings import router as settings_router
 from cmdb.api.users import router as users_router
 from cmdb.config import settings
 
@@ -49,6 +50,8 @@ def _is_admin_path(path: str, method: str) -> bool:
     """仅 admin 可操作的接口(其他用户只读)。"""
     if path.startswith("/api/v1/users"):
         return True
+    if method == "PUT" and path.startswith("/api/v1/settings"):
+        return True
     if method == "DELETE" and path.startswith("/api/v1/devices"):
         return True
     if method == "PUT" and path.startswith("/api/v1/devices"):
@@ -72,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")
+    app.include_router(settings_router, prefix="/api/v1")
 
     # 会话与角色拦截:/api/v1 除推送(采集器无需登录)与登录/会话检查外均要求登录;
     # 写操作(裁决/删除/标签/用户管理)仅 admin;角色从库中实时查询,变更即时生效。

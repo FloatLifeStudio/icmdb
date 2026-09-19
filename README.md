@@ -13,7 +13,7 @@ CMDB(CMDB v2)—— 采集推送、字段级 diff 冲突裁决、存储与展示
 - **nics 语义**:推送体显式标记全量(`agent.full_sync=true`,库中多出的进 diff 候删)/ 增量(只存推送的)
 - **冲突裁决**:字段级 diff;同设备已有 pending 时以最新一次推送重算 diff 整体替换(不累计);裁决生效后写 change_history
 - **硬件扩展**:网卡(`name` 为身份)、内存/CPU(`slot` 为身份)、硬盘/电源(`serial_number` 为身份)、GPU(`uuid` 为身份);OS 含虚拟化类型 `os.virt`;字段可选,不推不更新对应类别
-- **疑似下线**:查询时动态计算,默认 1 天(24 小时)阈值(`CMDB_OFFLINE_THRESHOLD_DAYS` 可配),数据不自动删
+- **疑似下线**:查询时动态计算,默认 1 天(24 小时)阈值,系统设置页可在线修改(`CMDB_OFFLINE_THRESHOLD_DAYS` 仅作初始默认值),数据不自动删
 - **写入权限**:推送 API 为唯一数据写入入口;UI 支持裁决、删除、标签、CSV 导入等管理操作
 - **用户与角色**:admin(可操作)/ viewer(只可查看)两级角色,admin 可管理用户、重置密码;所有用户可改自己密码;推送接口不鉴权,采集器无需改造
 - **删除语义**:DELETE 硬删设备与网卡、内存、CPU、硬盘、电源、GPU 数据,change_history 保留(追溯价值)
@@ -55,7 +55,7 @@ uv run pytest tests/ -v
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
 | `CMDB_DB_PATH` | `cmdb.db` | SQLite 数据库文件路径 |
-| `CMDB_OFFLINE_THRESHOLD_DAYS` | `3` | 疑似下线阈值(天) |
+| `CMDB_OFFLINE_THRESHOLD_DAYS` | `1` | 疑似下线阈值(天),仅作系统设置的初始默认值 |
 | `CMDB_STATIC_DIR` | `src/cmdb/static` | 前端构建产物目录 |
 | `CMDB_ADMIN_USER` | `admin` | 登录用户名 |
 | `CMDB_ADMIN_PASSWORD` | `admin` | 登录密码 |
