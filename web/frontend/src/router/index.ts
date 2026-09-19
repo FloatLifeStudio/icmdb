@@ -37,6 +37,15 @@ router.beforeEach(async (to) => {
       return '/login'
     }
   }
+  // API key management page requires the feature to be on (hidden from the sidebar when off)
+  if (to.path === '/api-keys') {
+    try {
+      const s = await api.getSystemSettings()
+      if (!s.api_key_enabled) return '/dashboard'
+    } catch {
+      return '/login'
+    }
+  }
   return true
 })
 

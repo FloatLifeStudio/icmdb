@@ -96,11 +96,33 @@ async function create() {
 }
 
 async function copyKey(row: ApiKey) {
-  try {
-    await navigator.clipboard.writeText(row.key)
+  const ok = await copyText(row.key)
+  if (ok) {
     ElMessage.success('已复制')
-  } catch {
+  } else {
     ElMessage.error('复制失败')
+  }
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    // HTTP (non-localhost) blocks the clipboard API, fall back to execCommand
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    try {
+      return document.execCommand('copy')
+    } catch {
+      return false
+    } finally {
+      document.body.removeChild(ta)
+    }
   }
 }
 
