@@ -25,9 +25,6 @@
         <el-menu-item v-if="role === 'admin'" index="/settings">
           <el-icon><Setting /></el-icon>系统设置
         </el-menu-item>
-        <el-menu-item v-if="role === 'admin' && apiKeyEnabled" index="/api-keys">
-          <el-icon><Key /></el-icon>API 密钥
-        </el-menu-item>
         <el-menu-item v-if="role === 'admin'" index="/audit-logs">
           <el-icon><Tickets /></el-icon>操作日志
         </el-menu-item>
@@ -73,14 +70,13 @@ body {
 import { provide, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
-import { Key, Monitor, EditPen, Odometer, Setting, Tickets, User } from '@element-plus/icons-vue'
+import { Monitor, EditPen, Odometer, Setting, Tickets, User } from '@element-plus/icons-vue'
 import { api } from './api'
 
 const route = useRoute()
 const pendingCount = ref(0)
 const username = ref('')
 const role = ref('viewer')
-const apiKeyEnabled = ref(false)
 
 // Pending count badge: refreshed on app entry and page switch (ConflictResolve calls loadPendingCount after a resolve is submitted)
 async function loadPendingCount() {
@@ -100,16 +96,6 @@ async function loadUsername() {
     role.value = res.role
   } catch {
     // Fail silently
-  }
-}
-
-// API key feature toggle: refreshed on app entry and page switch (SystemSettings changes it on save)
-async function loadApiKeyEnabled() {
-  try {
-    const res = await api.getSystemSettings()
-    apiKeyEnabled.value = res.api_key_enabled
-  } catch {
-    // Fail silently, page stays usable
   }
 }
 
@@ -149,10 +135,8 @@ async function changePassword() {
 }
 
 watch(() => route.path, loadPendingCount)
-watch(() => route.path, loadApiKeyEnabled)
 loadPendingCount()
 loadUsername()
-loadApiKeyEnabled()
 provide('refreshPendingCount', loadPendingCount)
 provide('userRole', role)
 </script>

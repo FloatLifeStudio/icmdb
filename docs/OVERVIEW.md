@@ -208,7 +208,7 @@ SQLite(WAL 模式,外键约束开启),SQLModel 建表,共 **14 张表**。所有
 | `mgmt_mac` / `mgmt_ip` / `mgmt_prefix_length` | string × 2 / int | 管理口三元组 |
 | `os_type` / `os_version` / `os_virt` / `kernel` | string | OS 四要素(type/version/virt 来自 `os.*`) |
 | `agent_version` | string | 采集器版本 |
-| `location` / `owner` / `purpose` | string | **CMDB 元数据**:机房/机柜位置、负责人、用途。UI 可编辑、CSV 导入导出,**推送不改** |
+| `purpose` | string | **CMDB 元数据**:用途。UI 内联编辑(仅 admin)、CSV 导入导出,**推送不改**;location/owner 接口保留但已从界面与 CSV 移除 |
 | `last_pushed_at` | datetime | 最后一次推送时间(naive UTC),疑似下线判定的依据 |
 | `created_at` / `updated_at` | datetime | 创建 / 最后更新时间 |
 
@@ -241,7 +241,7 @@ id、`device_id`(FK+索引)、`uuid`(身份,唯一约束 device_id+uuid)、`name
 
 ### 3.8 `device_tag` — 设备标签
 
-id、`device_id`(FK+索引)、`name`(索引),唯一约束 device_id+name。一行一个 device-tag 对。**CMDB 元数据**(UI 可编辑,不属于采集数据),替代旧版的逗号分隔 TEXT 列——拆表后可以精确匹配筛选、加唯一约束。
+id、`device_id`(FK+索引)、`name`(索引),唯一约束 device_id+name。一行一个 device-tag 对。**CMDB 元数据**(不属于采集数据),替代旧版的逗号分隔 TEXT 列——拆表后可以精确匹配筛选、加唯一约束。表保留,标签功能已从界面与 CSV 移除。
 
 ### 3.9 `pending_change` — 冲突待裁决
 
@@ -303,7 +303,7 @@ id、`username`(索引)、`action`(索引,如"删除设备")、`detail`(详情,�
 | `POST /devices/batch-delete` | admin | `{"ids": [1,2,3]}`,行为同单个删除;返回 `{"deleted": [id]}` |
 | `PUT /devices/{id}/tags` | admin | `{"tags": ["生产","web"]}` 全量替换 |
 | `PUT /devices/{id}/metadata` | admin | 更新 location/owner/purpose;字段可选,None=不改、空串=清空 |
-| `GET /devices/export/csv` | 登录 | 导出全部设备 CSV(UTF-8 BOM,Excel 兼容),列含标签与元数据 |
+| `GET /devices/export/csv` | 登录 | 导出全部设备 CSV(UTF-8 BOM,Excel 兼容),含 purpose 元数据列 |
 | `POST /devices/import/csv` | admin | multipart 上传,行格式与导出一致(可回导);逐行走推送清洗逻辑,`source=csv_import`,不触碰 `last_pushed_at` |
 
 **DeviceOut 结构**(列表与详情共用):id、hostname、serial_number、os_type/version/virt、kernel、agent_version、location/owner/purpose、mgmt_mac/ip/prefix_length、last_pushed_at、created_at/updated_at、**status(动态计算:active / suspected_offline,不入库)**、tags、nics(含 ips)、memory、cpus、disks、psus、gpus。
@@ -435,7 +435,7 @@ id、`username`(索引)、`action`(索引,如"删除设备")、`detail`(详情,�
 | `full_sync` 显式标记全量/增量 | 采集器可能只推部分硬件(采集失败/部分对接);由采集器声明语义,服务端不猜 |
 | null 标量不清空库中数据 | 部分采集失败不应抹掉上次的有效值 |
 | 身份为 null 的条目自动丢弃 | 没有身份的条目无法比对,存了是噪音 |
-| CMDB 元数据与采集数据分离 | location/owner/purpose/tags 是人的录入,推送永不覆盖,两个来源互不踩 |
+| CMDB 元数据与采集数据分离 | purpose 是人的录入,推送永不覆盖,两个来源互不踩 |
 | 容量归一化列 `size_gb` | 原始值(size + unit)保真展示,归一化列便于排序、统计 |
 | change_history 不设外键 | 设备硬删后历史保留,追溯独立于设备存活 |
 | SQLite + WAL 单文件 | 内网运维场景设备量级小(百级),零运维、备份即拷文件;备份脚本已装 cron |

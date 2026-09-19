@@ -15,7 +15,7 @@ Core trade-offs, confirmed item by item:
 - **Hardware extensions**: NICs (`name` as identity), memory/CPU (`slot` as identity), disks/PSUs (`serial_number` as identity), GPU (`uuid` as identity); OS includes virtualization type `os.virt`; fields are optional — a category not pushed is not updated
 - **Suspected offline**: computed dynamically at query time, default threshold of 1 day (24 hours), editable online on the system settings page (`CMDB_OFFLINE_THRESHOLD_DAYS` only serves as the initial default); data is never deleted automatically
 - **Write permissions**: the push API is the only data write entry point; the UI supports management operations such as resolution, deletion, tags and CSV import
-- **Device metadata**: location/owner/purpose are CMDB metadata (edited in the UI, imported/exported via CSV, never changed by pushes)
+- **Device metadata**: purpose is CMDB metadata (edited inline on the detail page, imported/exported via CSV, never changed by pushes); location/owner/tags have been removed from the UI and CSV
 - **Operation audit**: management operations such as deletion/resolution/tags/metadata/user management/system settings are automatically recorded in the audit log, visible in the UI to admin only
 - **Users and roles**: two-level roles — admin (can operate) / viewer (view only); admin can manage users and reset passwords; all users can change their own password; the push API requires no authentication by default, so collectors need no changes
 - **API keys**: named keys (`cmdb_` prefix, viewable/copyable/revocable anytime), managed by admin; once enabled in system settings, pushes require a key (the `X-API-Key` header), keys = push + read-only, blocking forged pushes

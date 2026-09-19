@@ -208,7 +208,7 @@ SQLite (WAL mode, foreign key constraints enabled), tables created with SQLModel
 | `mgmt_mac` / `mgmt_ip` / `mgmt_prefix_length` | string × 2 / int | Management-port triple |
 | `os_type` / `os_version` / `os_virt` / `kernel` | string | The four OS essentials (type/version/virt from `os.*`) |
 | `agent_version` | string | Collector version |
-| `location` / `owner` / `purpose` | string | **CMDB metadata**: server/rack location, owner, purpose. Editable in the UI, CSV import/export, **pushes never change it** |
+| `purpose` | string | **CMDB metadata**: usage purpose. Edited inline in the UI (admin only), CSV import/export, **pushes never change it**; location/owner endpoints remain but are removed from the UI and CSV |
 | `last_pushed_at` | datetime | Last push time (naive UTC), the basis for the suspected-offline determination |
 | `created_at` / `updated_at` | datetime | Creation / last update time |
 
@@ -303,7 +303,7 @@ All endpoints are mounted under `/api/v1`. Authentication is handled uniformly b
 | `POST /devices/batch-delete` | admin | `{"ids": [1,2,3]}`, same behavior as a single delete; returns `{"deleted": [id]}` |
 | `PUT /devices/{id}/tags` | admin | `{"tags": ["production","web"]}`, full replacement |
 | `PUT /devices/{id}/metadata` | admin | Updates location/owner/purpose; all fields optional, None = no change, empty string = clear |
-| `GET /devices/export/csv` | Login | Exports all devices as CSV (UTF-8 BOM, Excel-compatible); columns include tags and metadata |
+| `GET /devices/export/csv` | Login | Exports all devices as CSV (UTF-8 BOM, Excel-compatible); includes the purpose metadata column |
 | `POST /devices/import/csv` | admin | multipart upload, row format matches the export (can be imported back); each row goes through the push cleansing logic, `source=csv_import`, `last_pushed_at` untouched |
 
 **DeviceOut structure** (shared by list and detail): id, hostname, serial_number, os_type/version/virt, kernel, agent_version, location/owner/purpose, mgmt_mac/ip/prefix_length, last_pushed_at, created_at/updated_at, **status (computed dynamically: active / suspected_offline, not persisted)**, tags, nics (with ips), memory, cpus, disks, psus, gpus.
@@ -435,7 +435,7 @@ Note two naming differences: in the push body, memory is `memory.slots[]` and GP
 | `full_sync` explicitly flags full/incremental | Collectors may push only part of the hardware (collection failures / partial integration); the collector declares the semantics, the server does not guess |
 | null scalars do not clear DB data | A partial collection failure should not erase the last valid values |
 | Entries with a null identity are dropped automatically | Entries without an identity cannot be compared; storing them is noise |
-| CMDB metadata separated from collected data | location/owner/purpose/tags are human input, never overwritten by pushes; the two sources never step on each other |
+| CMDB metadata separated from collected data | purpose is human input, never overwritten by pushes; the two sources never step on each other |
 | Normalized capacity column `size_gb` | The raw value (size + unit) is preserved for display; the normalized column makes sorting and statistics easy |
 | change_history has no foreign key | History survives a device hard delete; traceability is independent of the device's existence |
 | SQLite + WAL, single file | The on-prem ops scenario has a small device count (hundreds); zero maintenance and backup is just copying the file; a backup script is already in cron |

@@ -206,8 +206,6 @@ export interface AuditLogRow {
 }
 
 export interface MetadataIn {
-  location?: string | null
-  owner?: string | null
   purpose?: string | null
 }
 
@@ -267,12 +265,6 @@ export const api = {
 
   batchDelete: (ids: number[]) =>
     request<{ deleted: number[] }>(`${BASE}/devices/batch-delete`, json('POST', { ids })),
-
-  updateTags: (id: number, tags: string[]) =>
-    request<{ device_id: number; tags: string[] }>(
-      `${BASE}/devices/${id}/tags`,
-      json('PUT', { tags }),
-    ),
 
   updateMetadata: (id: number, body: MetadataIn) =>
     request<{ device_id: number; location: string | null; owner: string | null; purpose: string | null }>(

@@ -75,10 +75,6 @@ def _device_status(device: Device, threshold: timedelta) -> str:
     return "active"
 
 
-def _split_tags(tags: str | None) -> list[str]:
-    return [t for t in (tags or "").split(",") if t]
-
-
 def _load_children(session: Session, device_ids: list[int]) -> _Children:
     """Batch-load child table data for multiple devices (one IN query per kind, avoids N+1)
 
@@ -131,18 +127,6 @@ def _load_children(session: Session, device_ids: list[int]) -> _Children:
     ).all():
         children["tags"].setdefault(row.device_id, []).append(row.name)
     return children
-
-
-def _device_tags_by_id(session: Session, device_id: int) -> list[str]:
-    """Tag name list for a single device"""
-    return [
-        row.name
-        for row in session.exec(
-            select(DeviceTag)
-            .where(DeviceTag.device_id == device_id)
-            .order_by(DeviceTag.id)
-        ).all()
-    ]
 
 
 def _replace_tags(session: Session, device_id: int, tags: list[str]) -> None:
@@ -450,7 +434,7 @@ def export_csv(session: Session = Depends(get_session)):
     writer.writerow(
         ["hostname", "serial_number", "os_type", "os_version", "os_virt",
          "kernel", "agent_version", "mgmt_mac", "mgmt_ip",
-         "mgmt_prefix_length", "tags", "location", "owner", "purpose",
+         "mgmt_prefix_length", "purpose",
          "status", "last_pushed_at", "nics", "gpu"]
     )
     for d in session.exec(select(Device).order_by(Device.hostname)).all():
@@ -482,9 +466,6 @@ def export_csv(session: Session = Depends(get_session)):
                 d.mgmt_mac or "",
                 d.mgmt_ip or "",
                 d.mgmt_prefix_length if d.mgmt_prefix_length is not None else "",
-                ",".join(_device_tags_by_id(session, d.id)),
-                d.location or "",
-                d.owner or "",
                 d.purpose or "",
                 _device_status(d, _offline_threshold(session)),
                 d.last_pushed_at.isoformat() if d.last_pushed_at else "",
@@ -598,22 +579,14 @@ async def import_csv(
         result = ingest_push(session, push, utcnow(), update_last_pushed=False)
         summary[result["result"]] += 1
 
-        # Tags and metadata are set with the import (CMDB metadata, not pushed through push cleaning)
-        meta = {
-            key: (row.get(key) or "").strip()
-            for key in ("location", "owner", "purpose")
-        }
-        tags = _split_tags(row.get("tags"))
-        if tags or any(meta.values()):
+        # Purpose is set with the import (CMDB metadata, not pushed through push cleaning)
+        purpose = (row.get("purpose") or "").strip()
+        if purpose:
             device = session.exec(
                 select(Device).where(Device.hostname == hostname)
             ).first()
             if device is not None:
-                if tags:
-                    _replace_tags(session, device.id, tags)
-                for key, val in meta.items():
-                    if val:
-                        setattr(device, key, val)
+                device.purpose = purpose
 
     record_audit(
         session,

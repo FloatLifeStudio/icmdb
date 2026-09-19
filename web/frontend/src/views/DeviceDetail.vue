@@ -14,12 +14,7 @@
     </el-page-header>
 
     <el-card v-if="device" class="card">
-      <template #header>
-        <div class="card-header">
-          <span>基本信息</span>
-          <el-button v-if="isAdmin" size="small" @click="openMetaEdit">编辑信息</el-button>
-        </div>
-      </template>
+      <template #header>基本信息</template>
       <el-descriptions :column="3" border>
         <el-descriptions-item label="Hostname">
           {{ device.hostname }}
@@ -51,20 +46,16 @@
         <el-descriptions-item label="子网前缀">
           {{ device.mgmt_prefix_length ?? '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="标签">
-          <el-tag v-for="t in device.tags" :key="t" size="small" class="tag">
-            {{ t }}
-          </el-tag>
-          <span v-if="!device.tags.length">-</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="位置">
-          {{ device.location || '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="负责人">
-          {{ device.owner || '-' }}
-        </el-descriptions-item>
         <el-descriptions-item label="用途">
-          {{ device.purpose || '-' }}
+          <el-input
+            v-if="isAdmin"
+            v-model="purposeInput"
+            size="small"
+            placeholder="用途"
+            style="max-width: 220px"
+            @change="savePurpose"
+          />
+          <span v-else>{{ device.purpose || '-' }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="上次推送">
           {{ fmt(device.last_pushed_at) }}
@@ -222,29 +213,6 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="metaDialogVisible" title="编辑信息" width="420px">
-      <el-form label-width="80">
-        <el-form-item label="标签">
-          <el-input
-            v-model="tagInput"
-            placeholder="多个标签用英文逗号分隔,如:生产,web"
-          />
-        </el-form-item>
-        <el-form-item label="位置">
-          <el-input v-model="metaInput.location" placeholder="机房/机柜位置" />
-        </el-form-item>
-        <el-form-item label="负责人">
-          <el-input v-model="metaInput.owner" placeholder="负责人" />
-        </el-form-item>
-        <el-form-item label="用途">
-          <el-input v-model="metaInput.purpose" placeholder="用途" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="metaDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveMeta">保存</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -265,9 +233,6 @@ const device = ref<DeviceOut | null>(null)
 const history = ref<HistoryRow[]>([])
 const loading = ref(false)
 const historyLoading = ref(false)
-const metaDialogVisible = ref(false)
-const tagInput = ref('')
-const metaInput = ref({ location: '', owner: '', purpose: '' })
 const historyTable = ref<TableInstance>()
 
 // Column width auto-fit: compute min-width from the longest content per column, fully visible by default
@@ -352,33 +317,18 @@ function fmt(ts: string | null): string {
   return new Date(utc).toLocaleString()
 }
 
-function openMetaEdit() {
-  tagInput.value = device.value?.tags.join(',') || ''
-  metaInput.value = {
-    location: device.value?.location || '',
-    owner: device.value?.owner || '',
-    purpose: device.value?.purpose || '',
-  }
-  metaDialogVisible.value = true
-}
+// Purpose inline edit (admin only): saved on change/enter, empty value clears it
+const purposeInput = ref('')
 
-async function saveMeta() {
+async function savePurpose() {
   if (!device.value) return
+  const val = purposeInput.value.trim()
+  if (val === (device.value.purpose || '')) return
   try {
-    const tags = tagInput.value.split(',').map((t) => t.trim()).filter(Boolean)
-    const res = await api.updateTags(device.value.id, tags)
-    device.value.tags = res.tags
-    const meta = {
-      location: metaInput.value.location,
-      owner: metaInput.value.owner,
-      purpose: metaInput.value.purpose,
-    }
-    const metaRes = await api.updateMetadata(device.value.id, meta)
-    device.value.location = metaRes.location
-    device.value.owner = metaRes.owner
-    device.value.purpose = metaRes.purpose
-    metaDialogVisible.value = false
-    ElMessage.success('信息已更新')
+    const res = await api.updateMetadata(device.value.id, { purpose: val || null })
+    device.value.purpose = res.purpose
+    purposeInput.value = res.purpose || ''
+    ElMessage.success('用途已更新')
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
@@ -388,6 +338,7 @@ async function load() {
   loading.value = true
   try {
     device.value = await api.getDevice(deviceId)
+    purposeInput.value = device.value.purpose || ''
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {
@@ -425,11 +376,6 @@ onMounted(async () => {
 }
 .card {
   margin-top: 16px;
-}
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 .tag {
   margin-right: 4px;

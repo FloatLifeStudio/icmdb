@@ -18,13 +18,6 @@
         <el-option label="活跃" value="active" />
         <el-option label="疑似下线" value="suspected_offline" />
       </el-select>
-      <el-input
-        v-model="tagFilter"
-        placeholder="按标签筛选(精确匹配)"
-        clearable
-        class="filter"
-        @input="debouncedLoad"
-      />
       <el-button type="primary" @click="load">刷新</el-button>
       <el-button @click="exportCsv">导出 CSV</el-button>
       <el-upload
@@ -68,14 +61,6 @@
       </el-table-column>
       <el-table-column prop="serial_number" label="序列号" min-width="140" sortable="custom" />
       <el-table-column prop="mgmt_ip" label="管理 IP" min-width="130" sortable="custom" />
-      <el-table-column label="标签" min-width="120">
-        <template #default="{ row }">
-          <el-tag v-for="t in row.tags" :key="t" size="small" class="tag">
-            {{ t }}
-          </el-tag>
-          <span v-if="!row.tags.length">-</span>
-        </template>
-      </el-table-column>
       <el-table-column label="状态" width="110">
         <template #default="{ row }">
           <el-tag :type="row.status === 'active' ? 'success' : 'warning'">
@@ -127,7 +112,6 @@ const page = ref(1)
 const pageSize = ref(20)
 const search = ref('')
 const statusFilter = ref('')
-const tagFilter = ref('')
 const sortBy = ref('')
 const sortOrder = ref('')
 const selected = ref<DeviceOut[]>([])
@@ -170,7 +154,6 @@ async function load() {
       page_size: pageSize.value,
       search: search.value || undefined,
       status: statusFilter.value || undefined,
-      tag: tagFilter.value || undefined,
       sort_by: sortBy.value || undefined,
       sort_order: sortOrder.value || undefined,
     })

@@ -363,9 +363,9 @@ def test_import_csv_roundtrip(client):
 def test_import_csv_creates_devices(client):
     csv_content = (
         "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
-        "tags,status,last_pushed_at,nics\n"
+        "purpose,status,last_pushed_at,nics\n"
         'demo-node-02,DEMO-SN-0008,02:00:00:00:00:01,192.0.2.13,24,'
-        '生产,active,2026-09-11T10:00:00,'
+        'web 服务,active,2026-09-11T10:00:00,'
         '"eth0(02:00:00:00:00:02): 198.51.100.15/24"\n'
     )
     r = client.post(
@@ -375,10 +375,10 @@ def test_import_csv_creates_devices(client):
     body = r.json()
     assert body["created"] == 1
 
-    # device + tags + NIC IP imported
+    # device + purpose + NIC IP imported
     detail = client.get("/api/v1/devices/1").json()
     assert detail["hostname"] == "demo-node-02"
-    assert detail["tags"] == ["生产"]
+    assert detail["purpose"] == "web 服务"
     assert detail["nics"][0]["ips"][0]["ip"] == "198.51.100.15"
 
     # reverse IP lookup finds the imported device
@@ -390,7 +390,7 @@ def test_import_csv_conflict_goes_to_pending(client):
     client.post("/api/v1/devices", json=make_push())
     csv_content = (
         "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
-        "tags,status,last_pushed_at,nics\n"
+        "purpose,status,last_pushed_at,nics\n"
         "demo-node-01,DEMO-SN-0001,02:00:00:00:00:01,192.0.2.12,24,,active,,\n"
     )
     r = client.post(
@@ -410,7 +410,7 @@ def test_import_csv_conflict_goes_to_pending(client):
 def test_import_csv_skips_malformed_rows(client):
     csv_content = (
         "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
-        "tags,status,last_pushed_at,nics\n"
+        "purpose,status,last_pushed_at,nics\n"
         ",no-hostname-here,,,,active,,\n"
         "demo-node-02,DEMO-SN-0008,02:00:00:00:00:01,192.0.2.13,24,,active,,\n"
     )

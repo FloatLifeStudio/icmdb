@@ -12,7 +12,6 @@ const router = createRouter({
     { path: '/conflicts', component: () => import('../views/ConflictResolve.vue') },
     { path: '/users', component: () => import('../views/Users.vue') },
     { path: '/settings', component: () => import('../views/SystemSettings.vue') },
-    { path: '/api-keys', component: () => import('../views/ApiKeys.vue') },
     { path: '/audit-logs', component: () => import('../views/AuditLog.vue') },
   ],
 })
@@ -29,19 +28,10 @@ router.beforeEach(async (to) => {
       return '/login'
     }
   }
-  if (to.path === '/users' || to.path === '/settings' || to.path === '/api-keys' || to.path === '/audit-logs') {
+  if (to.path === '/users' || to.path === '/settings' || to.path === '/audit-logs') {
     try {
       const me = await api.me()
       if (me.role !== 'admin') return '/dashboard'
-    } catch {
-      return '/login'
-    }
-  }
-  // API key management page requires the feature to be on (hidden from the sidebar when off)
-  if (to.path === '/api-keys') {
-    try {
-      const s = await api.getSystemSettings()
-      if (!s.api_key_enabled) return '/dashboard'
     } catch {
       return '/login'
     }

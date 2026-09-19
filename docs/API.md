@@ -405,8 +405,8 @@ curl "http://<host>:8080/api/v1/dashboard"
 
 ### `GET /api/v1/devices/export/csv` — 导出 CSV
 
-导出全部设备,UTF-8 BOM(Excel 中文兼容),列含标签与
-location/owner/purpose 元数据。`Content-Disposition: attachment`。
+导出全部设备,UTF-8 BOM(Excel 中文兼容),含 purpose 元数据列。
+`Content-Disposition: attachment`。
 
 ### `POST /api/v1/devices/import/csv` — CSV 导入
 
@@ -418,7 +418,7 @@ curl -X POST http://<host>:8080/api/v1/devices/import/csv \
 ```
 
 **行为**:逐行走与推送相同的清洗逻辑(hostname 匹配、diff 进待裁决),
-`source` 标记为 `csv_import`;标签与 location/owner/purpose 元数据随导入设置;
+`source` 标记为 `csv_import`;purpose 元数据随导入设置;
 不触碰 `last_pushed_at`(回导不会倒退最后推送时间)。
 
 ```json
@@ -427,20 +427,21 @@ curl -X POST http://<host>:8080/api/v1/devices/import/csv \
 
 `errors` 为解析失败(缺 hostname 等)的行说明,不影响其余行导入。
 
-### `PUT /api/v1/devices/{id}/tags` — 更新标签
+### `PUT /api/v1/devices/{id}/tags` — 更新标签(接口保留)
 
 ```json
 {"tags": ["生产", "web"]}
 ```
 
-全量替换;标签为 CMDB 元数据,不属于采集数据。
+接口保留(API 兼容);标签功能已从界面与 CSV 中移除。
 
 ### `PUT /api/v1/devices/{id}/metadata` — 更新设备信息
 
-更新 CMDB 元数据(机房/机柜位置、负责人、用途),推送不改,仅 UI/导入编辑:
+更新 CMDB 元数据(location/owner/purpose),推送不改,仅 UI/导入编辑;
+location 与 owner 接口保留但已从界面移除,界面只编辑 purpose:
 
 ```json
-{"location": "A栋-3F-01", "owner": "张三", "purpose": "web 服务"}
+{"purpose": "web 服务"}
 ```
 
 字段均可选:`None` = 不改,空串 = 清空;值首尾空白自动去除。

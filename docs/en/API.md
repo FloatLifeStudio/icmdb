@@ -403,8 +403,8 @@ curl "http://<host>:8080/api/v1/dashboard"
 
 ### `GET /api/v1/devices/export/csv` — Export CSV
 
-Exports all devices as UTF-8 with BOM (Excel Chinese-compatible); columns include tags and
-the location/owner/purpose metadata. `Content-Disposition: attachment`.
+Exports all devices as UTF-8 with BOM (Excel Chinese-compatible); includes the purpose
+metadata column. `Content-Disposition: attachment`.
 
 ### `POST /api/v1/devices/import/csv` — CSV import
 
@@ -416,7 +416,7 @@ curl -X POST http://<host>:8080/api/v1/devices/import/csv \
 ```
 
 **Behavior**: each row goes through the same cleansing logic as a push (hostname matching, diffs to pending resolution),
-with `source` marked as `csv_import`; tags and location/owner/purpose metadata are set along with the import;
+with `source` marked as `csv_import`; the purpose metadata is set along with the import;
 `last_pushed_at` is not touched (importing back does not roll back the last push time).
 
 ```json
@@ -425,20 +425,21 @@ with `source` marked as `csv_import`; tags and location/owner/purpose metadata a
 
 `errors` describes rows that failed to parse (missing hostname etc.), without affecting the import of the remaining rows.
 
-### `PUT /api/v1/devices/{id}/tags` — Update tags
+### `PUT /api/v1/devices/{id}/tags` — Update tags (endpoint kept)
 
 ```json
 {"tags": ["production", "web"]}
 ```
 
-Full replacement; tags are CMDB metadata, not part of the collected data.
+The endpoint remains (API compatible); the tags feature has been removed from the UI and CSV.
 
 ### `PUT /api/v1/devices/{id}/metadata` — Update device info
 
-Updates CMDB metadata (server/rack location, owner, purpose); pushes never change it, only UI/import editing:
+Updates CMDB metadata (location/owner/purpose); pushes never change it, only UI/import editing;
+location and owner endpoints remain but are removed from the UI, the UI edits purpose only:
 
 ```json
-{"location": "Building A-3F-01", "owner": "Zhang San", "purpose": "web service"}
+{"purpose": "web service"}
 ```
 
 All fields are optional: `None` = no change, empty string = clear; leading and trailing whitespace is trimmed automatically.
