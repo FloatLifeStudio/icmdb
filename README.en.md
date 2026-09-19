@@ -17,7 +17,8 @@ Core trade-offs, confirmed item by item:
 - **Write permissions**: the push API is the only data write entry point; the UI supports management operations such as resolution, deletion, tags and CSV import
 - **Device metadata**: location/owner/purpose are CMDB metadata (edited in the UI, imported/exported via CSV, never changed by pushes)
 - **Operation audit**: management operations such as deletion/resolution/tags/metadata/user management/system settings are automatically recorded in the audit log, visible in the UI to admin only
-- **Users and roles**: two-level roles — admin (can operate) / viewer (view only); admin can manage users and reset passwords; all users can change their own password; the push API requires no authentication, so collectors need no changes
+- **Users and roles**: two-level roles — admin (can operate) / viewer (view only); admin can manage users and reset passwords; all users can change their own password; the push API requires no authentication by default, so collectors need no changes
+- **API keys**: named keys (`cmdb_` prefix, viewable/copyable/revocable anytime), managed by admin; once enabled in system settings, pushes require a key (the `X-API-Key` header), keys = push + read-only, blocking forged pushes
 - **Deletion semantics**: DELETE hard-deletes a device and its NIC, memory, CPU, disk, PSU and GPU data; change_history is preserved (for traceability)
 
 ## Tech Stack

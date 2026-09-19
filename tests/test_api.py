@@ -9,18 +9,18 @@ from cmdb.models import Device, utcnow
 def make_push(**overrides) -> dict:
     """Build a base push payload, overridable per field"""
     base = {
-        "hostname": "S1A01DC-VL101",
-        "serial_number": "PF4ABC123456",
+        "hostname": "demo-node-01",
+        "serial_number": "DEMO-SN-0001",
         "mgmt": {
-            "mac": "AA:BB:CC:DD:EE:01",
-            "ip": "192.168.10.101",
+            "mac": "02:00:00:00:00:01",
+            "ip": "192.0.2.11",
             "prefix_length": 24,
         },
         "nics": [
-            {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-             "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
-            {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-             "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
+            {"name": "eth0", "mac": "02:00:00:00:00:02",
+             "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]},
+            {"name": "eth1", "mac": "02:00:00:00:00:03",
+             "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]},
         ],
         "full_sync": True,
         "source": "collector",
@@ -40,7 +40,7 @@ def test_push_created_and_unchanged(client):
 
 def test_push_diff_created(client):
     client.post("/api/v1/devices", json=make_push())
-    push = make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+    push = make_push(mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                            "prefix_length": 24})
     r = client.post("/api/v1/devices", json=push)
     body = r.json()
@@ -58,15 +58,15 @@ def test_new_format_push_with_gpu(client):
     push = {
         "agent": {"version": "0.1.0", "source": "collector",
                   "timestamp": "2026-09-13T10:00:00+08:00"},
-        "os": {"hostname": "S1A01DC-VL101", "type": "linux",
+        "os": {"hostname": "demo-node-01", "type": "linux",
                "version": "Ubuntu 22.04.5 LTS", "kernel": "5.15.0-131-generic"},
-        "mgmt": {"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.101",
+        "mgmt": {"mac": "02:00:00:00:00:01", "ip": "192.0.2.11",
                  "prefix_length": 24},
         "hardware": {
-            "chassis_serial_number": "PF4ABC123456",
+            "chassis_serial_number": "DEMO-SN-0001",
             "gpu": {"slots": [
                 {"uuid": "GPU-abc", "name": "NVIDIA H100 80GB HBM3",
-                 "serial_number": "2Q4123123132", "size": 80, "size_unit": "GB",
+                 "serial_number": "DEMO-SN-0007", "size": 80, "size_unit": "GB",
                  "driver_version": "535.183.01", "pcie_id": "0000:1B:00.0"}
             ]},
         },
@@ -88,10 +88,10 @@ def test_new_format_push_with_gpu(client):
 def test_legacy_format_compatible(client):
     """Legacy format (top-level hostname etc.) auto-converted, old collectors keep working"""
     legacy = {
-        "hostname": "S1A01DC-VL101",
-        "serial_number": "PF4ABC123456",
-        "nics": [{"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-                  "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]}],
+        "hostname": "demo-node-01",
+        "serial_number": "DEMO-SN-0001",
+        "nics": [{"name": "eth0", "mac": "02:00:00:00:00:02",
+                  "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]}],
         "full_sync": False,
         "source": "collector",
     }
@@ -99,8 +99,8 @@ def test_legacy_format_compatible(client):
     assert r.status_code == 200
     assert r.json()["result"] == "created"
     detail = client.get("/api/v1/devices/1").json()
-    assert detail["hostname"] == "S1A01DC-VL101"
-    assert detail["serial_number"] == "PF4ABC123456"
+    assert detail["hostname"] == "demo-node-01"
+    assert detail["serial_number"] == "DEMO-SN-0001"
 
 
 def test_list_and_detail(client):
@@ -115,8 +115,8 @@ def test_list_and_detail(client):
 
     device_id = item["id"]
     detail = client.get(f"/api/v1/devices/{device_id}").json()
-    assert detail["hostname"] == "S1A01DC-VL101"
-    assert detail["nics"][0]["ips"][0]["ip"] == "10.10.1.101"
+    assert detail["hostname"] == "demo-node-01"
+    assert detail["nics"][0]["ips"][0]["ip"] == "198.51.100.11"
 
 
 def test_list_search_and_status_filter(client, engine):
@@ -124,7 +124,7 @@ def test_list_search_and_status_filter(client, engine):
 
     r = client.get("/api/v1/devices", params={"search": "nomatch"})
     assert r.json()["total"] == 0
-    r = client.get("/api/v1/devices", params={"search": "S1A01DC"})
+    r = client.get("/api/v1/devices", params={"search": "demo-node"})
     assert r.json()["total"] == 1
 
     # manually backdate last_pushed_at by 4 days -> suspected_offline
@@ -142,10 +142,10 @@ def test_list_search_and_status_filter(client, engine):
 
 def test_resolve_flow(client):
     client.post("/api/v1/devices", json=make_push())
-    push = make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+    push = make_push(mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                            "prefix_length": 24},
-                     nics=[{"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-                            "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]}])
+                     nics=[{"name": "eth0", "mac": "02:00:00:00:00:02",
+                            "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]}])
     pending_id = client.post("/api/v1/devices", json=push).json()["pending_change_id"]
 
     # pending resolution list
@@ -154,7 +154,7 @@ def test_resolve_flow(client):
 
     # diff detail
     detail = client.get(f"/api/v1/pending-changes/{pending_id}").json()
-    assert detail["payload"]["mgmt"]["ip"] == "192.168.10.200"
+    assert detail["payload"]["mgmt"]["ip"] == "192.0.2.12"
     fields = {f["field"] for f in detail["diff"]["fields"]}
     assert fields == {"mgmt.ip"}
 
@@ -168,7 +168,7 @@ def test_resolve_flow(client):
 
     # device data updated per the resolution
     device = client.get("/api/v1/devices/1").json()
-    assert device["mgmt_ip"] == "192.168.10.200"
+    assert device["mgmt_ip"] == "192.0.2.12"
     assert [n["name"] for n in device["nics"]] == ["eth0"]
 
     # resolving twice -> 409
@@ -181,7 +181,7 @@ def test_resolve_flow(client):
 
 def test_resolve_discard(client):
     client.post("/api/v1/devices", json=make_push())
-    push = make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+    push = make_push(mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                            "prefix_length": 24})
     pending_id = client.post("/api/v1/devices", json=push).json()["pending_change_id"]
 
@@ -192,12 +192,12 @@ def test_resolve_discard(client):
     assert r.status_code == 200
 
     device = client.get("/api/v1/devices/1").json()
-    assert device["mgmt_ip"] == "192.168.10.101"  # original value kept
+    assert device["mgmt_ip"] == "192.0.2.11"  # original value kept
 
 
 def test_change_history(client):
     client.post("/api/v1/devices", json=make_push())
-    push = make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+    push = make_push(mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                            "prefix_length": 24})
     pending_id = client.post("/api/v1/devices", json=push).json()["pending_change_id"]
     client.post(
@@ -224,8 +224,8 @@ def test_list_sort_and_multi_field_search(client):
     client.post("/api/v1/devices", json=make_push())
     client.post("/api/v1/devices", json=make_push(
         hostname="S1B02DC-VL102",
-        serial_number="PF4XYZ654321",
-        mgmt={"mac": "AA:BB:CC:DD:EE:11", "ip": "10.0.0.5", "prefix_length": 24},
+        serial_number="DEMO-SN-0012",
+        mgmt={"mac": "02:00:00:00:00:11", "ip": "10.0.0.5", "prefix_length": 24},
     ))
 
     # sort by management IP descending
@@ -239,7 +239,7 @@ def test_list_sort_and_multi_field_search(client):
     assert items[0]["mgmt_ip"] < items[-1]["mgmt_ip"]
 
     # search covers serial number and management IP
-    r = client.get("/api/v1/devices", params={"search": "PF4XYZ"})
+    r = client.get("/api/v1/devices", params={"search": "DEMO-SN-0012"})
     assert r.json()["total"] == 1
     r = client.get("/api/v1/devices", params={"search": "10.0.0.5"})
     assert r.json()["total"] == 1
@@ -261,9 +261,9 @@ def test_dashboard(client):
 def test_ip_reverse_search(client):
     """Searching a NIC business IP finds the device via reverse lookup"""
     client.post("/api/v1/devices", json=make_push())
-    r = client.get("/api/v1/devices", params={"search": "10.10.2.101"})
+    r = client.get("/api/v1/devices", params={"search": "198.51.100.13"})
     assert r.json()["total"] == 1
-    assert r.json()["items"][0]["hostname"] == "S1A01DC-VL101"
+    assert r.json()["items"][0]["hostname"] == "demo-node-01"
 
 
 def test_tags(client):
@@ -325,7 +325,7 @@ def test_batch_delete(client):
 
 def test_history_detail(client):
     client.post("/api/v1/devices", json=make_push())
-    push = make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+    push = make_push(mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                            "prefix_length": 24})
     pending_id = client.post("/api/v1/devices", json=push).json()["pending_change_id"]
     client.post(
@@ -334,7 +334,7 @@ def test_history_detail(client):
     )
 
     body = client.get("/api/v1/change-history/1").json()
-    assert body["summary"] == "mgmt.ip: 192.168.10.101 -> 192.168.10.200"
+    assert body["summary"] == "mgmt.ip: 192.0.2.11 -> 192.0.2.12"
     assert body["diff"]["fields"][0]["field"] == "mgmt.ip"
 
 
@@ -342,7 +342,7 @@ def test_export_csv(client):
     client.post("/api/v1/devices", json=make_push())
     r = client.get("/api/v1/devices/export/csv")
     assert r.status_code == 200
-    assert "S1A01DC-VL101" in r.text
+    assert "demo-node-01" in r.text
     assert r.text.lstrip("﻿").startswith("hostname")
 
 
@@ -364,9 +364,9 @@ def test_import_csv_creates_devices(client):
     csv_content = (
         "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
         "tags,status,last_pushed_at,nics\n"
-        'S1C03DC-VL103,PF4IMP111111,AA:BB:CC:00:00:01,192.168.30.103,24,'
+        'demo-node-02,DEMO-SN-0008,02:00:00:00:00:01,192.0.2.13,24,'
         '生产,active,2026-09-11T10:00:00,'
-        '"eth0(AA:BB:CC:00:00:02): 10.10.3.103/24"\n'
+        '"eth0(02:00:00:00:00:02): 198.51.100.15/24"\n'
     )
     r = client.post(
         "/api/v1/devices/import/csv",
@@ -377,12 +377,12 @@ def test_import_csv_creates_devices(client):
 
     # device + tags + NIC IP imported
     detail = client.get("/api/v1/devices/1").json()
-    assert detail["hostname"] == "S1C03DC-VL103"
+    assert detail["hostname"] == "demo-node-02"
     assert detail["tags"] == ["生产"]
-    assert detail["nics"][0]["ips"][0]["ip"] == "10.10.3.103"
+    assert detail["nics"][0]["ips"][0]["ip"] == "198.51.100.15"
 
     # reverse IP lookup finds the imported device
-    r = client.get("/api/v1/devices", params={"search": "10.10.3.103"})
+    r = client.get("/api/v1/devices", params={"search": "198.51.100.15"})
     assert r.json()["total"] == 1
 
 
@@ -391,7 +391,7 @@ def test_import_csv_conflict_goes_to_pending(client):
     csv_content = (
         "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
         "tags,status,last_pushed_at,nics\n"
-        "S1A01DC-VL101,PF4ABC123456,AA:BB:CC:DD:EE:01,192.168.10.200,24,,active,,\n"
+        "demo-node-01,DEMO-SN-0001,02:00:00:00:00:01,192.0.2.12,24,,active,,\n"
     )
     r = client.post(
         "/api/v1/devices/import/csv",
@@ -401,7 +401,7 @@ def test_import_csv_conflict_goes_to_pending(client):
     assert body["diff_created"] == 1
 
     # existing data unchanged, pending created
-    assert client.get("/api/v1/devices/1").json()["mgmt_ip"] == "192.168.10.101"
+    assert client.get("/api/v1/devices/1").json()["mgmt_ip"] == "192.0.2.11"
     pendings = client.get("/api/v1/pending-changes").json()["items"]
     assert len(pendings) == 1
     assert pendings[0]["source"] == "csv_import"
@@ -412,7 +412,7 @@ def test_import_csv_skips_malformed_rows(client):
         "hostname,serial_number,mgmt_mac,mgmt_ip,mgmt_prefix_length,"
         "tags,status,last_pushed_at,nics\n"
         ",no-hostname-here,,,,active,,\n"
-        "S1C03DC-VL103,PF4IMP111111,AA:BB:CC:00:00:01,192.168.30.103,24,,active,,\n"
+        "demo-node-02,DEMO-SN-0008,02:00:00:00:00:01,192.0.2.13,24,,active,,\n"
     )
     r = client.post(
         "/api/v1/devices/import/csv",
@@ -444,7 +444,7 @@ def test_push_memory_and_cpu_end_to_end(client):
             "slots": [
                 {"slot": "DIMM_A1", "manufacturer": "Samsung",
                  "part_number": "M321R8GA0BB0-CQKZJ", "type": "DDR5",
-                 "size_gb": 64, "speed_mts": 4800, "serial_number": "123123456"}
+                 "size_gb": 64, "speed_mts": 4800, "serial_number": "DEMO-MEM-01"}
             ]
         },
         cpus=[
@@ -490,15 +490,15 @@ def test_push_disk_and_psu_end_to_end(client):
     """Push with disks/PSUs: created -> visible in detail -> model diff -> resolution applied"""
     push = make_push(
         disks=[
-            {"serial_number": "123123123", "type": "SSD",
+            {"serial_number": "DEMO-SN-0010", "type": "SSD",
              "manufacturer": "Samsung", "model": "990EVO",
              "size": 8, "size_unit": "TB"},
-            {"serial_number": "123456", "type": "HDD",
+            {"serial_number": "DEMO-SN-0011", "type": "HDD",
              "manufacturer": "HGST", "model": "HUH728080ALE604",
              "size": 8, "size_unit": "TB"},
         ],
         psus=[
-            {"serial_number": "2P0123123132", "manufacturer": "GreatWall",
+            {"serial_number": "DEMO-SN-0005", "manufacturer": "GreatWall",
              "model": "CRPS2700D2", "max_power_w": 2700},
         ],
     )
@@ -510,15 +510,15 @@ def test_push_disk_and_psu_end_to_end(client):
     assert body["disks"][0]["model"] == "990EVO"
     assert body["disks"][0]["size"] == 8
     assert body["disks"][0]["size_unit"] == "TB"
-    assert [p["serial_number"] for p in body["psus"]] == ["2P0123123132"]
+    assert [p["serial_number"] for p in body["psus"]] == ["DEMO-SN-0005"]
 
     # disk model change -> diff -> resolution adopts the new value
     push2 = make_push(
         disks=[
-            {"serial_number": "123123123", "type": "SSD",
+            {"serial_number": "DEMO-SN-0010", "type": "SSD",
              "manufacturer": "Samsung", "model": "990PRO",
              "size": 8, "size_unit": "TB"},
-            {"serial_number": "123456", "type": "HDD",
+            {"serial_number": "DEMO-SN-0011", "type": "HDD",
              "manufacturer": "HGST", "model": "HUH728080ALE604",
              "size": 8, "size_unit": "TB"},
         ],
@@ -530,10 +530,10 @@ def test_push_disk_and_psu_end_to_end(client):
 
     r = client.post(
         f"/api/v1/pending-changes/{pending_id}/resolve",
-        json={"field_choices": {}, "nic_choices": {}, "disk_choices": {"123123123": "new"}},
+        json={"field_choices": {}, "nic_choices": {}, "disk_choices": {"DEMO-SN-0010": "new"}},
     )
     assert r.status_code == 200
-    assert "硬盘 123123123 model: 990EVO -> 990PRO" in r.json()["applied"]
+    assert "硬盘 DEMO-SN-0010 model: 990EVO -> 990PRO" in r.json()["applied"]
 
     body = client.get(f"/api/v1/devices/{device_id}").json()
     assert body["disks"][0]["model"] == "990PRO"
@@ -641,17 +641,17 @@ def test_change_own_password(client):
 
 def test_system_settings_read_update(client):
     """System settings: GET/PUT, device status reacts immediately after a threshold change"""
-    # default is 24 hours
+    # default is 24 hours, API key feature off
     r = client.get("/api/v1/settings/system")
     assert r.status_code == 200
-    assert r.json() == {"offline_threshold_hours": 24}
+    assert r.json() == {"offline_threshold_hours": 24, "api_key_enabled": False}
 
     client.post("/api/v1/devices", json=make_push())
 
     # threshold set to 1 hour -> a push from 2 hours ago becomes suspected offline
     r = client.put("/api/v1/settings/system", json={"offline_threshold_hours": 1})
     assert r.status_code == 200
-    assert r.json() == {"offline_threshold_hours": 1}
+    assert r.json() == {"offline_threshold_hours": 1, "api_key_enabled": False}
 
     # manually backdate last_pushed_at by 2 hours -> beyond the 1 hour threshold -> suspected_offline
     from cmdb.database import get_engine_cached
@@ -773,3 +773,101 @@ def test_audit_logs_viewer_forbidden(client):
     assert _login_as(client, "viewer1", "v1pass").status_code == 200
     assert client.get("/api/v1/audit-logs").status_code == 403
     assert client.get("/api/v1/devices").status_code == 200
+
+
+def test_api_key_management(client):
+    """API key CRUD: admin creates / lists (full key) / revokes; viewer gets 403"""
+    # create
+    r = client.post("/api/v1/api-keys", json={"name": "iagent-prod"})
+    assert r.status_code == 200
+    key = r.json()["key"]
+    assert key.startswith("cmdb_") and len(key) == 5 + 32
+    assert r.json()["prefix"] == key[:12]
+    assert r.json()["last_used_at"] is None
+
+    # empty name -> 422
+    assert client.post("/api/v1/api-keys", json={"name": "  "}).status_code == 422
+
+    # list shows the full key
+    r = client.get("/api/v1/api-keys")
+    assert r.status_code == 200
+    assert any(k["key"] == key for k in r.json()["items"])
+
+    # viewer is forbidden on key management
+    client.post("/api/v1/users", json={"username": "viewer1", "password": "v1pass", "role": "viewer"})
+    assert _login_as(client, "viewer1", "v1pass").status_code == 200
+    assert client.get("/api/v1/api-keys").status_code == 403
+    assert client.post("/api/v1/api-keys", json={"name": "x"}).status_code == 403
+
+    # back to admin, revoke
+    assert _login_as(client, "admin", "admin").status_code == 200
+    key_id = client.get("/api/v1/api-keys").json()["items"][0]["id"]
+    assert client.delete(f"/api/v1/api-keys/{key_id}").status_code == 200
+    assert client.get("/api/v1/api-keys").json()["items"] == []
+
+    # nonexistent key -> 404
+    assert client.delete("/api/v1/api-keys/99999").status_code == 404
+
+    # key management is audited
+    actions = [i["action"] for i in client.get("/api/v1/audit-logs").json()["items"]]
+    assert "创建 API 密钥" in actions
+    assert "吊销 API 密钥" in actions
+
+
+def test_api_key_auth_flow(client):
+    """X-API-Key: when enabled, push requires a key, GET is allowed, writes get 403; off restores"""
+    key = client.post("/api/v1/api-keys", json={"name": "k1"}).json()["key"]
+    headers = {"X-API-Key": key}
+
+    # feature off (default): push is open, the key header is ignored
+    assert client.post("/api/v1/devices", json=make_push()).status_code == 200
+
+    # enable the feature
+    client.put(
+        "/api/v1/settings/system",
+        json={"offline_threshold_hours": 24, "api_key_enabled": True},
+    )
+
+    # push without a key -> 401
+    assert client.post("/api/v1/devices", json=make_push()).status_code == 401
+
+    # invalid key -> 401
+    assert client.post("/api/v1/devices", json=make_push(), headers={"X-API-Key": "cmdb_bad"}).status_code == 401
+
+    # valid key push -> 200
+    assert client.post("/api/v1/devices", json=make_push(), headers=headers).status_code == 200
+
+    # last_used_at is updated
+    used = client.get("/api/v1/api-keys").json()["items"][0]["last_used_at"]
+    assert used is not None
+
+    # GET with the key -> 200
+    assert client.get("/api/v1/devices", headers=headers).status_code == 200
+    assert client.get("/api/v1/dashboard", headers=headers).status_code == 200
+
+    # key management via key -> 403 (cookie-admin only)
+    assert client.get("/api/v1/api-keys", headers=headers).status_code == 403
+
+    # writes with the key -> 403
+    device_id = client.get("/api/v1/devices").json()["items"][0]["id"]
+    assert client.put(f"/api/v1/devices/{device_id}/tags", json={"tags": ["x"]}, headers=headers).status_code == 403
+    assert client.delete(f"/api/v1/devices/{device_id}", headers=headers).status_code == 403
+
+    # session cookie still works (admin), writes included
+    assert client.get("/api/v1/devices").status_code == 200
+    assert client.put(f"/api/v1/devices/{device_id}/tags", json={"tags": ["prod"]}).status_code == 200
+
+    # disable -> push is open again
+    client.put(
+        "/api/v1/settings/system",
+        json={"offline_threshold_hours": 24, "api_key_enabled": False},
+    )
+    assert client.post("/api/v1/devices", json=make_push()).status_code == 200
+
+    # revoked key -> 401 after re-enabling
+    client.delete(f"/api/v1/api-keys/{client.get('/api/v1/api-keys').json()['items'][0]['id']}")
+    client.put(
+        "/api/v1/settings/system",
+        json={"offline_threshold_hours": 24, "api_key_enabled": True},
+    )
+    assert client.post("/api/v1/devices", json=make_push(), headers=headers).status_code == 401

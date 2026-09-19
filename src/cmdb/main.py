@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 
 from cmdb.api.auth import SESSION_COOKIE, token_username
 from cmdb.api.auth import router as auth_router
+from cmdb.api.api_keys import router as api_keys_router
 from cmdb.api.audit_logs import router as audit_logs_router
 from cmdb.api.dashboard import router as dashboard_router
 from cmdb.api.devices import router as devices_router
@@ -53,6 +54,8 @@ def _is_admin_path(path: str, method: str) -> bool:
         return True
     if path.startswith("/api/v1/audit-logs"):
         return True
+    if path.startswith("/api/v1/api-keys"):
+        return True
     if method == "PUT" and path.startswith("/api/v1/settings"):
         return True
     if method == "DELETE" and path.startswith("/api/v1/devices"):
@@ -79,9 +82,10 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")
     app.include_router(settings_router, prefix="/api/v1")
+    app.include_router(api_keys_router, prefix="/api/v1")
     app.include_router(audit_logs_router, prefix="/api/v1")
 
-    # Session and role gating: /api/v1 requires login except for push (collectors need no login) and login/session check;
+    # Session and role gating: /api/v1 requires login except for login/session check;
     # write operations (resolve/delete/tags/user management) are admin only; roles are queried from the DB in real time, changes take effect immediately
     # Static assets (the login page itself) are not intercepted, the frontend route guard handles redirects
     exempt = {
@@ -93,7 +97,30 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _auth_middleware(request, call_next):
         path = request.url.path
-        if path.startswith("/api/v1") and (path, request.method) not in exempt:
+        if not path.startswith("/api/v1"):
+            return await call_next(request)
+
+        # API key feature (system setting, default off): a valid key allows collector push
+        # plus read-only GET; writes return 403. Keys are checked before the session cookie.
+        if _api_key_enabled():
+            api_key = request.headers.get("X-API-Key")
+            if api_key:
+                row = _find_api_key(api_key)
+                if row is None:
+                    return JSONResponse({"detail": "无效的 API 密钥"}, status_code=401)
+                method = request.method
+                key_management = path.startswith("/api/v1/api-keys")
+                if key_management or not (
+                    method == "GET" or (method == "POST" and path == "/api/v1/devices")
+                ):
+                    return JSONResponse({"detail": "API 密钥仅支持推送和只读访问"}, status_code=403)
+                _touch_api_key(row)
+                return await call_next(request)
+            # Key feature on: collector push must carry a valid key
+            if (path, request.method) == ("/api/v1/devices", "POST"):
+                return JSONResponse({"detail": "推送需要 API 密钥"}, status_code=401)
+
+        if (path, request.method) not in exempt:
             username = token_username(request.cookies.get(SESSION_COOKIE))
             if username is None:
                 return JSONResponse({"detail": "未登录"}, status_code=401)
@@ -116,6 +143,40 @@ def _user_role(username: str) -> str:
     with Session(get_engine_cached()) as session:
         user = session.exec(select(User).where(User.username == username)).first()
         return user.role if user else ""
+
+
+def _api_key_enabled() -> bool:
+    """API key feature toggle (system setting api_key_enabled, default off)"""
+    from cmdb.database import get_engine_cached
+    from cmdb.api.settings import get_api_key_enabled
+
+    with Session(get_engine_cached()) as session:
+        return get_api_key_enabled(session)
+
+
+def _find_api_key(key: str):
+    """Look up an API key row by the full key value"""
+    from cmdb.database import get_engine_cached
+    from cmdb.models import ApiKey
+
+    with Session(get_engine_cached()) as session:
+        return session.exec(select(ApiKey).where(ApiKey.key == key)).first()
+
+
+def _touch_api_key(row) -> None:
+    """Update last_used_at for the key (best effort, per request)"""
+    from cmdb.database import get_engine_cached
+    from cmdb.models import ApiKey, utcnow
+
+    try:
+        with Session(get_engine_cached()) as session:
+            db_row = session.get(ApiKey, row.id)
+            if db_row:
+                db_row.last_used_at = utcnow()
+                session.add(db_row)
+                session.commit()
+    except Exception:
+        pass
 
 
 app = create_app()

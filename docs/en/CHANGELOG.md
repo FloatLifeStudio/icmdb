@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), versions follow 
 
 ### Added
 
+- **API keys**: named keys (`cmdb_` + 32 hex, viewable/copyable anytime, admin-managed);
+  once enabled in system settings (`api_key_enabled`, default off), collector pushes require a valid
+  key (`X-API-Key`), keys allow push + read-only GET, other writes return 403; creation/revocation audited
 - **User management**: two roles, admin / viewer (viewer is read-only, write ops return 403);
   admin can create / delete users, reset passwords, change roles, with last-admin protection
 - **Change own password**: `POST /api/v1/auth/change-password`, all roles, requires the old password

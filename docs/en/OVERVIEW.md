@@ -73,7 +73,7 @@ Push → hostname matched against devices in the DB
   },
   "mgmt": {
     "mac": "aa:bb:cc:dd:ee:ff",
-    "ip": "192.168.201.18",
+    "ip": "192.0.2.10",
     "prefix_length": 24
   },
   "hardware": {
@@ -283,7 +283,7 @@ id, `username` (indexed), `action` (indexed, e.g. "delete device"), `detail` (e.
 
 ## 4. API Endpoints
 
-All endpoints are mounted under `/api/v1`. Authentication is handled uniformly by middleware: **everything requires login except `POST /devices` (open to collectors) and login/session checks**; write operations (resolve / delete / tags / metadata / user management / settings) are admin only. Roles are queried from the DB in real time, so changes take effect immediately.
+All endpoints are mounted under `/api/v1`. Authentication is handled uniformly by middleware: **everything requires login except login/session checks**; write operations (resolve / delete / tags / metadata / user management / settings) are admin only. Roles are queried from the DB in real time, so changes take effect immediately. When the system setting `api_key_enabled` is on, `POST /devices` requires a valid API key (the `X-API-Key` header, see API.md §12); key requests may also GET read-only, while all other writes return 403.
 
 ### 4.1 Collector push
 
@@ -457,7 +457,7 @@ Note two naming differences: in the push body, memory is `memory.slots[]` and GP
 
 ### 7.2 Potential issues and improvement directions (sorted by impact)
 
-1. **Forged pushes are unauthenticated (medium, security)**: POST /devices being open means anyone on the intranet can flood the CMDB with fake devices and forged diffs. Resolution is gate-kept by a human, but fake devices pollute the list and statistics. **Improvement**: the device count is small, so adding a shared collection token (validated via a request header) is extremely cheap; or a source-IP whitelist.
+1. **Forged pushes are unauthenticated (medium, security)**: POST /devices is open by default, meaning anyone on the intranet can flood the CMDB with fake devices and forged diffs. Resolution is gate-kept by a human, but fake devices pollute the list and statistics. **Addressed**: v2.3 introduces API keys (`X-API-Key` + a system setting toggle); once enabled, pushes require a valid key, keys = push + read-only, keeping the blast radius of a leak contained; default off guarantees zero breakage.
 2. **SQLite single writer, push concurrency limited (low, imperceptible at the current scale)**: WAL mitigates read/write mutual exclusion, but writes are still serial. A few hundred devices pushing every few minutes is plenty; at a thousand-plus devices pushing frequently, PostgreSQL would be needed (architecturally the SQLModel migration cost is manageable, but JSON column queries and the migration scripts would all need rewriting).
 3. **Hostname renames produce orphan devices (low, a fallback already exists)**: hostname is the matching key, so a rename = a new device + a leftover old device (suspected-offline will expose it), and the old one must be deleted manually. Automatic merging risks mis-identification (two devices taking the same hostname one after another); the current "expose + delete manually" is a pragmatic choice; the improvement direction is a one-click "merge into the new device" in the UI.
 4. **No pagination for pending changes (low)**: `GET /pending-changes` returns everything; the device count is small + only one pending record per device, so the list will not explode, but in extreme cases (many devices changing at once) pagination could be added.
@@ -467,4 +467,4 @@ Note two naming differences: in the push body, memory is `memory.slots[]` and GP
 
 ### 7.3 Conclusion
 
-The current design is **sound and self-consistent** for its target scenario of "on-prem ops, hundreds of devices, a single or a few admins": every trade-off (dynamic status, one pending record, lightweight migration, SQLite) matches the scenario, with no obvious over-engineering; the alignment of the tolerance semantics with the collector is the key to this system's smooth integration. The one improvement most worth investing in is the **collection token** (a low-cost way to block forged pushes); the remaining issues can wait until the volume grows.
+The current design is **sound and self-consistent** for its target scenario of "on-prem ops, hundreds of devices, a single or a few admins": every trade-off (dynamic status, one pending record, lightweight migration, SQLite) matches the scenario, with no obvious over-engineering; the alignment of the tolerance semantics with the collector is the key to this system's smooth integration. The one improvement most worth investing in — the **collection token** — has landed in v2.3 as API keys (a low-cost way to block forged pushes); the remaining issues can wait until the volume grows.

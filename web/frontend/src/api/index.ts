@@ -185,6 +185,16 @@ export interface UserInfo {
 
 export interface SystemSettings {
   offline_threshold_hours: number
+  api_key_enabled: boolean
+}
+
+export interface ApiKey {
+  id: number
+  name: string
+  key: string
+  prefix: string
+  created_at: string
+  last_used_at: string | null
 }
 
 export interface AuditLogRow {
@@ -322,4 +332,10 @@ export const api = {
     const qs = username ? `?username=${encodeURIComponent(username)}` : ''
     return request<{ items: AuditLogRow[] }>(`${BASE}/audit-logs${qs}`)
   },
+
+  listApiKeys: () => request<{ items: ApiKey[] }>(`${BASE}/api-keys`),
+
+  createApiKey: (name: string) => request<ApiKey>(`${BASE}/api-keys`, json('POST', { name })),
+
+  deleteApiKey: (id: number) => request<{ ok: boolean }>(`${BASE}/api-keys/${id}`, { method: 'DELETE' }),
 }

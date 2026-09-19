@@ -18,19 +18,19 @@ def make_push(**overrides) -> DevicePush:
     """Build a new-format push payload (2 NICs), overridable per field; legacy keys map onto the new structure"""
     base = {
         "agent": {"source": "collector", "full_sync": True},
-        "os": {"hostname": "S1A01DC-VL101"},
+        "os": {"hostname": "demo-node-01"},
         "mgmt": {
-            "mac": "AA:BB:CC:DD:EE:01",
-            "ip": "192.168.10.101",
+            "mac": "02:00:00:00:00:01",
+            "ip": "192.0.2.11",
             "prefix_length": 24,
         },
         "hardware": {
-            "chassis_serial_number": "PF4ABC123456",
+            "chassis_serial_number": "DEMO-SN-0001",
             "nics": [
-                {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-                 "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
-                {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-                 "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
+                {"name": "eth0", "mac": "02:00:00:00:00:02",
+                 "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]},
+                {"name": "eth1", "mac": "02:00:00:00:00:03",
+                 "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]},
             ],
         },
     }
@@ -63,8 +63,8 @@ def test_created_branch(engine):
 
         assert result["result"] == "created"
         assert result["pending_change_id"] is None
-        device = get_device(session, "S1A01DC-VL101")
-        assert device.mgmt_ip == "192.168.10.101"
+        device = get_device(session, "demo-node-01")
+        assert device.mgmt_ip == "192.0.2.11"
         assert device.last_pushed_at == RECEIVED_AT
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
         assert len(nics) == 2
@@ -88,20 +88,20 @@ def test_unchanged_branch(engine):
 def test_diff_created_branch(engine):
     with Session(engine) as session:
         ingest_push(session, make_push(), RECEIVED_AT)
-        push = make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+        push = make_push(mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                                "prefix_length": 24})
         result = ingest_push(session, push, RECEIVED_AT)
 
         assert result["result"] == "diff_created"
         assert result["pending_change_id"] is not None
         # existing data unchanged
-        device = get_device(session, "S1A01DC-VL101")
-        assert device.mgmt_ip == "192.168.10.101"
+        device = get_device(session, "demo-node-01")
+        assert device.mgmt_ip == "192.0.2.11"
         # pending record created
         pending = session.get(PendingChange, result["pending_change_id"])
         assert pending.status == "pending"
         assert pending.diff["fields"] == [
-            {"field": "mgmt.ip", "old": "192.168.10.101", "new": "192.168.10.200"}
+            {"field": "mgmt.ip", "old": "192.0.2.11", "new": "192.0.2.12"}
         ]
 
 
@@ -111,13 +111,13 @@ def test_conflict_pushes_replace_with_latest(engine):
         ingest_push(session, make_push(), RECEIVED_AT)
         first = ingest_push(
             session,
-            make_push(mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+            make_push(mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                             "prefix_length": 24}),
             RECEIVED_AT,
         )
         second = ingest_push(
             session,
-            make_push(serial_number="PF4ABC999999"),
+            make_push(serial_number="DEMO-SN-0009"),
             RECEIVED_AT,
         )
 
@@ -130,7 +130,7 @@ def test_conflict_pushes_replace_with_latest(engine):
         diff = pendings[0].diff
         # whole replacement: only the latest push's differences remain (mgmt.ip is back to the db value, no longer pending)
         fields = {f["field"]: f for f in diff["fields"]}
-        assert fields["hardware.chassis_serial_number"]["new"] == "PF4ABC999999"
+        assert fields["hardware.chassis_serial_number"]["new"] == "DEMO-SN-0009"
         assert "mgmt.ip" not in fields
 
 
@@ -169,8 +169,8 @@ def test_full_sync_removed_nic_in_diff(engine):
     with Session(engine) as session:
         ingest_push(session, make_push(), RECEIVED_AT)
         push = make_push(nics=[
-            {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-             "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
+            {"name": "eth0", "mac": "02:00:00:00:00:02",
+             "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]},
         ])
         result = ingest_push(session, push, RECEIVED_AT)
 
@@ -187,7 +187,7 @@ def test_push_timestamp_normalized_to_utc(engine):
         push = make_push(timestamp=datetime.fromisoformat("2026-09-11T23:30:00+08:00"))
         result = ingest_push(session, push, RECEIVED_AT)
         assert result["result"] == "created"
-        device = get_device(session, "S1A01DC-VL101")
+        device = get_device(session, "demo-node-01")
         assert device.last_pushed_at == datetime(2026, 9, 11, 15, 30, 0)
 
 
@@ -201,8 +201,8 @@ def test_real_collector_example_json(engine):
         result = ingest_push(session, push, RECEIVED_AT)
         assert result["result"] == "created"
 
-        device = get_device(session, "S1A01DC-VL101")
-        assert device.serial_number == "PF4ABC123456"
+        device = get_device(session, "demo-node-01")
+        assert device.serial_number == "DEMO-SN-0001"
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
         assert len(nics) == 4
         # last_pushed_at comes from agent.timestamp (2026-09-13T10:00+08:00 -> UTC)
@@ -220,7 +220,7 @@ def test_iagent_format_payload(engine):
         "agent": {"version": "0.3.0", "source": "iagent", "timestamp": "",
                   "full_sync": True},
         "os": {
-            "hostname": "GPU-NODE-07",
+            "hostname": "demo-gpu-02",
             "type": "linux",
             "version": "Ubuntu 22.04",
             "kernel": "5.15.0-91-generic",
@@ -230,9 +230,9 @@ def test_iagent_format_payload(engine):
         "hardware": {
             "chassis_serial_number": None,
             "nics": [
-                {"name": "eth0", "mac": "D0:8D:7D:C2:F7:2A", "ips": None},
+                {"name": "eth0", "mac": "02:00:00:00:00:2A", "ips": None},
                 {"name": "eth1", "mac": None,
-                 "ips": [{"ip": "10.20.0.7", "prefix_length": 24}]},
+                 "ips": [{"ip": "203.0.113.7", "prefix_length": 24}]},
             ],
             "memory": {
                 "slots": [
@@ -246,7 +246,7 @@ def test_iagent_format_payload(engine):
                 {"slot": None, "model": None},
             ],
             "disks": [
-                {"serial_number": "S5XNX0GF123456", "type": "SSD",
+                {"serial_number": "DEMO-SN-0004", "type": "SSD",
                  "size": 480, "size_unit": "GB"},
                 # SN collection failed -> dropped
                 {"serial_number": None, "type": "HDD"},
@@ -254,7 +254,7 @@ def test_iagent_format_payload(engine):
             "psus": [{"serial_number": None, "max_power_w": 2700}],
             "gpu": {
                 "slots": [
-                    {"uuid": "GPU-9a2b3c4d", "name": "NVIDIA A800-SXM4-80GB",
+                    {"uuid": "GPU-demo-0002", "name": "NVIDIA A800-SXM4-80GB",
                      "size": 80, "size_unit": "GB"},
                     # uuid collection failed -> dropped
                     {"uuid": None, "name": "NVIDIA A800-SXM4-80GB"},
@@ -274,7 +274,7 @@ def test_iagent_format_payload(engine):
         result = ingest_push(session, push, RECEIVED_AT)
         assert result["result"] == "created"
 
-        device = get_device(session, "GPU-NODE-07")
+        device = get_device(session, "demo-gpu-02")
         assert device.os_virt == "kvm"
         assert device.os_type == "linux"
         # empty timestamp -> not collected, falls back to the received time
@@ -286,13 +286,13 @@ def test_iagent_format_payload(engine):
         assert len(nics) == 2
         nic0 = next(n for n in nics if n.name == "eth0")
         nic1 = next(n for n in nics if n.name == "eth1")
-        assert nic0.mac == "D0:8D:7D:C2:F7:2A"
+        assert nic0.mac == "02:00:00:00:00:2A"
         # eth0 ips=null -> no IP; eth1 has one
         assert session.exec(
             select(NicIP).where(NicIP.nic_id == nic0.id)
         ).all() == []
         ips1 = session.exec(select(NicIP).where(NicIP.nic_id == nic1.id)).all()
-        assert [(i.ip, i.prefix_length) for i in ips1] == [("10.20.0.7", 24)]
+        assert [(i.ip, i.prefix_length) for i in ips1] == [("203.0.113.7", 24)]
 
         # re-pushing identical data -> unchanged (no pending created)
         again = ingest_push(session, push, RECEIVED_AT)
@@ -303,15 +303,15 @@ def test_iagent_virt_change_goes_to_diff(engine):
     """A virt change goes into the host field diff"""
     with Session(engine) as session:
         first = make_push(
-            hostname="S1A01DC-VL101",
-            os={"hostname": "S1A01DC-VL101", "virt": "bare_metal"},
+            hostname="demo-node-01",
+            os={"hostname": "demo-node-01", "virt": "bare_metal"},
         )
         result = ingest_push(session, first, RECEIVED_AT)
         assert result["result"] == "created"
 
         second = make_push(
-            hostname="S1A01DC-VL101",
-            os={"hostname": "S1A01DC-VL101", "virt": "kvm"},
+            hostname="demo-node-01",
+            os={"hostname": "demo-node-01", "virt": "kvm"},
         )
         result = ingest_push(session, second, RECEIVED_AT)
         assert result["result"] == "diff_created"

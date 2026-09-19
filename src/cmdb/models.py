@@ -1,5 +1,5 @@
 """SQLModel table models: device / device_tag / nic / nic_ip / memoryslot / cpu /
-disk / psu / pending_change / changehistory"""
+disk / psu / pending_change / changehistory / user / system_setting / audit_log / api_key"""
 
 from datetime import datetime, timezone
 
@@ -226,3 +226,14 @@ class AuditLog(SQLModel, table=True):
     action: str = Field(index=True)
     detail: str | None = None
     created_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class ApiKey(SQLModel, table=True):
+    """API key for collector push and read-only API access (admin-managed, viewable anytime)"""
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    key: str
+    prefix: str
+    created_at: datetime = Field(default_factory=utcnow)
+    last_used_at: datetime | None = None

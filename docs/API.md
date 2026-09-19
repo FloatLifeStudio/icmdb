@@ -24,6 +24,7 @@
 - [用户登录](#9-用户登录)
 - [用户管理](#10-用户管理)
 - [操作审计](#11-操作审计)
+- [API 密钥](#12-api-密钥)
 
 ---
 
@@ -50,29 +51,29 @@
     "full_sync": true
   },
   "os": {
-    "hostname": "S1A01DC-VL101",
+    "hostname": "demo-node-01",
     "type": "Linux",
     "version": "Ubuntu 22.04",
     "kernel": "5.15.0-91-generic",
     "virt": "bare_metal"
   },
   "mgmt": {
-    "mac": "AA:BB:CC:DD:EE:01",
-    "ip": "192.168.10.101",
+    "mac": "02:00:00:00:00:01",
+    "ip": "192.0.2.11",
     "prefix_length": 24
   },
   "hardware": {
-    "chassis_serial_number": "PF4ABC123456",
+    "chassis_serial_number": "DEMO-SN-0001",
     "nics": [
       {
         "name": "eth0",
-        "mac": "AA:BB:CC:DD:EE:02",
-        "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]
+        "mac": "02:00:00:00:00:02",
+        "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]
       },
       {
         "name": "eth1",
-        "mac": "AA:BB:CC:DD:EE:03",
-        "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
+        "mac": "02:00:00:00:00:03",
+        "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]
       }
     ],
     "memory": {
@@ -85,7 +86,7 @@
           "size": 64,
           "size_unit": "GB",
           "speed_mts": 4800,
-          "serial_number": "123123456"
+          "serial_number": "DEMO-MEM-01"
         }
       ]
     },
@@ -94,21 +95,21 @@
       {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
     ],
     "disks": [
-      {"serial_number": "123123123", "type": "SSD", "manufacturer": "Samsung",
+      {"serial_number": "DEMO-SN-0010", "type": "SSD", "manufacturer": "Samsung",
        "model": "990EVO", "size": 8, "size_unit": "TB"},
-      {"serial_number": "123456", "type": "HDD", "manufacturer": "HGST",
+      {"serial_number": "DEMO-SN-0011", "type": "HDD", "manufacturer": "HGST",
        "model": "HUH728080ALE604", "size": 8, "size_unit": "TB"}
     ],
     "psus": [
-      {"serial_number": "2P0123123132", "manufacturer": "GreatWall",
+      {"serial_number": "DEMO-SN-0005", "manufacturer": "GreatWall",
        "model": "CRPS2700D2", "max_power_w": 2700}
     ],
     "gpu": {
       "slots": [
         {
-          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-9a1b2c3d4e5f",
+          "uuid": "GPU-00000000-0000-0000-0000-9a1b2c3d4e5f",
           "name": "NVIDIA GeForce RTX 4090",
-          "serial_number": "G123456",
+          "serial_number": "DEMO-GPU-0001",
           "size": 24,
           "size_unit": "GB",
           "driver_version": "550.54.14",
@@ -156,7 +157,7 @@
 **curl 示例**:
 
 ```bash
-curl -X POST http://192.168.201.18:8080/api/v1/devices \
+curl -X POST http://<host>:8080/api/v1/devices \
   -H "Content-Type: application/json" \
   -d @collector.json
 ```
@@ -191,7 +192,7 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices \
 | `sort_order` | `asc` | `asc` / `desc` |
 
 ```bash
-curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
+curl "http://<host>:8080/api/v1/devices?page=1&search=demo&status=active"
 ```
 
 **响应**:
@@ -204,10 +205,10 @@ curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
   "items": [
     {
       "id": 1,
-      "hostname": "S1A01DC-VL101",
-      "serial_number": "PF4ABC123456",
-      "mgmt_mac": "AA:BB:CC:DD:EE:01",
-      "mgmt_ip": "192.168.10.101",
+      "hostname": "demo-node-01",
+      "serial_number": "DEMO-SN-0001",
+      "mgmt_mac": "02:00:00:00:00:01",
+      "mgmt_ip": "192.0.2.11",
       "mgmt_prefix_length": 24,
       "last_pushed_at": "2026-09-11T08:43:39",
       "created_at": "2026-09-11T08:43:39",
@@ -217,8 +218,8 @@ curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
         {
           "id": 1,
           "name": "eth0",
-          "mac": "AA:BB:CC:DD:EE:02",
-          "ips": [{"id": 1, "ip": "10.10.1.101", "prefix_length": 24}]
+          "mac": "02:00:00:00:00:02",
+          "ips": [{"id": 1, "ip": "198.51.100.11", "prefix_length": 24}]
         }
       ]
     }
@@ -238,7 +239,7 @@ curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
 硬删设备与网卡、内存、CPU、硬盘、电源、GPU 数据(待裁决记录连带删除);**变更历史保留**。成功返回 204。
 
 ```bash
-curl -X DELETE http://192.168.201.18:8080/api/v1/devices/1
+curl -X DELETE http://<host>:8080/api/v1/devices/1
 ```
 
 ---
@@ -250,7 +251,7 @@ curl -X DELETE http://192.168.201.18:8080/api/v1/devices/1
 **查询参数**:`status` 默认 `pending`;`all` 可看含已处理(applied / discarded)的全量。
 
 ```bash
-curl "http://192.168.201.18:8080/api/v1/pending-changes"
+curl "http://<host>:8080/api/v1/pending-changes"
 ```
 
 **响应**(`diff` 为字段级差异清单):
@@ -265,15 +266,15 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
       "payload": {"...": "推送原始 JSON,结构同 POST /devices 请求体"},
       "diff": {
         "fields": [
-          {"field": "mgmt.ip", "old": "192.168.10.101", "new": "192.168.10.200"}
+          {"field": "mgmt.ip", "old": "192.0.2.11", "new": "192.0.2.12"}
         ],
         "nics": [
           {
             "name": "eth1",
             "kind": "removed",
             "changes": [],
-            "old": {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-                    "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
+            "old": {"name": "eth1", "mac": "02:00:00:00:00:03",
+                    "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]},
             "new": null
           }
         ],
@@ -314,9 +315,9 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
   "nic_choices": {"eth1": "new", "eth2": "old"},
   "memory_choices": {"DIMM_A1": "new"},
   "cpu_choices": {"CPU0": "new"},
-  "disk_choices": {"123123123": "new"},
-  "psu_choices": {"2P0123123132": "new"},
-  "gpu_choices": {"GPU-3f2a1b9c": "new"}
+  "disk_choices": {"DEMO-SN-0010": "new"},
+  "psu_choices": {"DEMO-SN-0005": "new"},
+  "gpu_choices": {"GPU-demo-0001": "new"}
 }
 ```
 
@@ -334,7 +335,7 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 
 ```json
 {
-  "applied": ["mgmt.ip: 192.168.10.101 -> 192.168.10.200", "网卡 eth1 删除"],
+  "applied": ["mgmt.ip: 192.0.2.11 -> 192.0.2.12", "网卡 eth1 删除"],
   "pending_id": 1,
   "status": "applied"
 }
@@ -352,7 +353,7 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
 **查询参数**:`device_id` 可选,按设备过滤。设备硬删后其历史仍可查。
 
 ```bash
-curl "http://192.168.201.18:8080/api/v1/change-history?device_id=1"
+curl "http://<host>:8080/api/v1/change-history?device_id=1"
 ```
 
 **响应**:
@@ -363,7 +364,7 @@ curl "http://192.168.201.18:8080/api/v1/change-history?device_id=1"
     {
       "id": 1,
       "device_id": 1,
-      "summary": "mgmt.ip: 192.168.10.101 -> 192.168.10.200; 网卡 eth1 删除",
+      "summary": "mgmt.ip: 192.0.2.11 -> 192.0.2.12; 网卡 eth1 删除",
       "source": "collector",
       "diff": {"...": "裁决时的完整差异清单,结构同待裁决 diff"},
       "created_at": "2026-09-11T08:43:57"
@@ -385,7 +386,7 @@ curl "http://192.168.201.18:8080/api/v1/change-history?device_id=1"
 资产概览统计:总数、活跃/疑似下线、待裁决数、最近 10 条变更。
 
 ```bash
-curl "http://192.168.201.18:8080/api/v1/dashboard"
+curl "http://<host>:8080/api/v1/dashboard"
 ```
 
 ```json
@@ -412,7 +413,7 @@ location/owner/purpose 元数据。`Content-Disposition: attachment`。
 `multipart/form-data` 上传,字段名 `file`,行格式与导出一致(可直接回导)。
 
 ```bash
-curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
+curl -X POST http://<host>:8080/api/v1/devices/import/csv \
   -F "file=@devices.csv"
 ```
 
@@ -476,12 +477,13 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 
 ### `GET /api/v1/settings/system`
 
-返回 `{"offline_threshold_hours": 24}`(疑似下线阈值,小时)。
+返回 `{"offline_threshold_hours": 24, "api_key_enabled": false}`(疑似下线阈值小时数 + API 密钥功能开关)。
 
 ### `PUT /api/v1/settings/system`
 
-仅 admin(其他用户 403)。请求体 `{"offline_threshold_hours": 24}`,取值 1 ~ 8760;
-非法值 422。
+仅 admin(其他用户 403)。请求体 `{"offline_threshold_hours": 24, "api_key_enabled": false}`,
+阈值取值 1 ~ 8760,非法值 422;`api_key_enabled` 可选,不传保持不变。
+开启后采集器推送必须携带有效密钥(见 [API 密钥](#12-api-密钥))。
 
 ## 9. 用户登录
 
@@ -558,6 +560,7 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 | 裁决 / 删除设备 / 批量删除 | ✅ | ❌ 403 |
 | 编辑标签 / 编辑设备信息 / CSV 导入 | ✅ | ❌ |
 | 用户管理 / 操作日志 | ✅ | ❌ |
+| API 密钥管理 | ✅ | ❌ |
 
 ## 11. 操作审计
 
@@ -575,6 +578,55 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 ```
 
 按时间倒序;viewer 访问返回 403。
+
+## 12. API 密钥
+
+API 密钥用于**采集器推送 + 只读 API 访问**,解决"伪造推送无门槛"问题:
+
+- 格式 `cmdb_` + 32 位十六进制,存完整密钥(可随时查看/复制)并附 12 位前缀识别
+- 权限:携带密钥可 `POST /devices`(推送)与任意 `GET`;**其余写操作与密钥管理接口返回 403**——泄露破坏面可控
+- 默认**关闭**(系统设置 `api_key_enabled`):一切照旧,推送开放、会话 cookie 逻辑不变
+- 开启后:`POST /devices` 必须携带有效密钥,缺失或无效返回 401;带 `X-API-Key` 的请求按密钥权限处理(优先于会话 cookie);每次请求刷新密钥的 last_used_at
+- 吊销(删除)立即生效,使用该密钥的请求马上返回 401;创建/吊销均记录审计日志
+- 密钥管理仅 admin(其他用户 403)
+
+### `GET /api/v1/api-keys`
+
+返回全部密钥(**含完整密钥值**,可随时复制):
+
+```json
+{"items": [{"id": 1, "name": "iagent-prod", "key": "cmdb_a1b2c3...",
+            "prefix": "cmdb_a1b2c3", "created_at": "...", "last_used_at": "..."}]}
+```
+
+### `POST /api/v1/api-keys`
+
+```json
+{"name": "iagent-prod"}
+```
+
+返回新建的密钥(含完整密钥值);名称空白返回 422。建议按采集器/来源命名,便于单独吊销。
+
+### `DELETE /api/v1/api-keys/{id}` — 吊销密钥
+
+返回 `{"ok": true}`;密钥不存在返回 404。
+
+### curl 用法
+
+推送(开启 `api_key_enabled` 后必须带密钥):
+
+```bash
+curl -X POST http://<host>:8080/api/v1/devices \
+  -H "X-API-Key: cmdb_你的密钥" \
+  -H "Content-Type: application/json" \
+  -d @tests/data/collector_example_full.json
+```
+
+只读 GET 同理:
+
+```bash
+curl -H "X-API-Key: cmdb_你的密钥" http://<host>:8080/api/v1/devices
+```
 
 ## 附:配置项(环境变量)
 

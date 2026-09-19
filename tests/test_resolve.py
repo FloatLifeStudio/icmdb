@@ -26,19 +26,19 @@ def make_push(**overrides) -> DevicePush:
     """Build a new-format push payload (2 NICs), overridable per field; legacy keys map onto the new structure"""
     base = {
         "agent": {"source": "collector", "full_sync": True},
-        "os": {"hostname": "S1A01DC-VL101"},
+        "os": {"hostname": "demo-node-01"},
         "mgmt": {
-            "mac": "AA:BB:CC:DD:EE:01",
-            "ip": "192.168.10.101",
+            "mac": "02:00:00:00:00:01",
+            "ip": "192.0.2.11",
             "prefix_length": 24,
         },
         "hardware": {
-            "chassis_serial_number": "PF4ABC123456",
+            "chassis_serial_number": "DEMO-SN-0001",
             "nics": [
-                {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-                 "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
-                {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-                 "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
+                {"name": "eth0", "mac": "02:00:00:00:00:02",
+                 "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]},
+                {"name": "eth1", "mac": "02:00:00:00:00:03",
+                 "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]},
             ],
         },
     }
@@ -72,34 +72,34 @@ def setup_conflict(session: Session, **push_overrides) -> PendingChange:
 def test_apply_field_choice_new(engine):
     with Session(engine) as session:
         pending = setup_conflict(
-            session, mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+            session, mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                            "prefix_length": 24}
         )
         result = apply_resolution(session, pending, {"mgmt.ip": "new"}, {})
 
-        assert result["applied"] == ["mgmt.ip: 192.168.10.101 -> 192.168.10.200"]
+        assert result["applied"] == ["mgmt.ip: 192.0.2.11 -> 192.0.2.12"]
         device = session.get(Device, pending.device_id)
-        assert device.mgmt_ip == "192.168.10.200"  # new value applied
-        assert device.serial_number == "PF4ABC123456"  # unselected fields unchanged
+        assert device.mgmt_ip == "192.0.2.12"  # new value applied
+        assert device.serial_number == "DEMO-SN-0001"  # unselected fields unchanged
         assert pending.status == "applied"
         assert pending.resolved_at is not None
         histories = session.exec(select(ChangeHistory)).all()
         assert len(histories) == 1
-        assert histories[0].summary == "mgmt.ip: 192.168.10.101 -> 192.168.10.200"
+        assert histories[0].summary == "mgmt.ip: 192.0.2.11 -> 192.0.2.12"
         assert histories[0].source == "collector"
 
 
 def test_apply_field_choice_old_keeps_current(engine):
     with Session(engine) as session:
         pending = setup_conflict(
-            session, mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+            session, mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                            "prefix_length": 24}
         )
         result = apply_resolution(session, pending, {"mgmt.ip": "old"}, {})
 
         assert result["applied"] == []  # current state kept, no applied changes
         device = session.get(Device, pending.device_id)
-        assert device.mgmt_ip == "192.168.10.101"
+        assert device.mgmt_ip == "192.0.2.11"
         assert session.exec(select(ChangeHistory)).all() == []
         assert pending.status == "applied"
 
@@ -107,12 +107,12 @@ def test_apply_field_choice_old_keeps_current(engine):
 def test_apply_nic_added(engine):
     with Session(engine) as session:
         pending = setup_conflict(session, nics=[
-            {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-             "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
-            {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-             "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
-            {"name": "eth9", "mac": "AA:BB:CC:DD:EE:09",
-             "ips": [{"ip": "10.10.9.1", "prefix_length": 24}]},
+            {"name": "eth0", "mac": "02:00:00:00:00:02",
+             "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]},
+            {"name": "eth1", "mac": "02:00:00:00:00:03",
+             "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]},
+            {"name": "eth9", "mac": "02:00:00:00:00:09",
+             "ips": [{"ip": "198.51.100.19", "prefix_length": 24}]},
         ])
         result = apply_resolution(session, pending, {}, {"eth9": "new"})
 
@@ -123,14 +123,14 @@ def test_apply_nic_added(engine):
         eth9 = next(n for n in nics if n.name == "eth9")
         ips = session.exec(select(NicIP).where(NicIP.nic_id == eth9.id)).all()
         assert len(ips) == 1
-        assert ips[0].ip == "10.10.9.1"
+        assert ips[0].ip == "198.51.100.19"
 
 
 def test_apply_nic_removed(engine):
     with Session(engine) as session:
         pending = setup_conflict(session, nics=[
-            {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-             "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
+            {"name": "eth0", "mac": "02:00:00:00:00:02",
+             "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]},
         ])
         result = apply_resolution(session, pending, {}, {"eth1": "new"})
 
@@ -139,17 +139,17 @@ def test_apply_nic_removed(engine):
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
         assert [n.name for n in nics] == ["eth0"]  # eth1 and its IPs deleted
         ips = session.exec(select(NicIP)).all()
-        assert [ip.ip for ip in ips] == ["10.10.1.101"]
+        assert [ip.ip for ip in ips] == ["198.51.100.11"]
 
 
 def test_apply_nic_changed(engine):
     with Session(engine) as session:
         pending = setup_conflict(session, nics=[
-            {"name": "eth0", "mac": "AA:BB:CC:DD:EE:99",
-             "ips": [{"ip": "10.10.1.101", "prefix_length": 24},
-                     {"ip": "10.10.1.102", "prefix_length": 24}]},
-            {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-             "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
+            {"name": "eth0", "mac": "02:00:00:00:00:99",
+             "ips": [{"ip": "198.51.100.11", "prefix_length": 24},
+                     {"ip": "198.51.100.12", "prefix_length": 24}]},
+            {"name": "eth1", "mac": "02:00:00:00:00:03",
+             "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]},
         ])
         result = apply_resolution(session, pending, {}, {"eth0": "new"})
 
@@ -157,23 +157,23 @@ def test_apply_nic_changed(engine):
         device = session.get(Device, pending.device_id)
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
         eth0 = next(n for n in nics if n.name == "eth0")
-        assert eth0.mac == "AA:BB:CC:DD:EE:99"
+        assert eth0.mac == "02:00:00:00:00:99"
         ips = session.exec(select(NicIP).where(NicIP.nic_id == eth0.id)).all()
-        assert sorted(ip.ip for ip in ips) == ["10.10.1.101", "10.10.1.102"]
+        assert sorted(ip.ip for ip in ips) == ["198.51.100.11", "198.51.100.12"]
 
 
 def test_apply_mixed_choices(engine):
     """Host field set to new, removal candidate kept: mixed resolution"""
     with Session(engine) as session:
         pending = setup_conflict(session, nics=[
-            {"name": "eth0", "mac": "AA:BB:CC:DD:EE:02",
-             "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]},
+            {"name": "eth0", "mac": "02:00:00:00:00:02",
+             "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]},
         ])
         result = apply_resolution(session, pending, {"serial_number": "new"},
                                   {"eth1": "old"})
 
         device = session.get(Device, pending.device_id)
-        assert device.serial_number == "PF4ABC123456"  # same as in db, choosing new has no real change
+        assert device.serial_number == "DEMO-SN-0001"  # same as in db, choosing new has no real change
         nics = session.exec(select(Nic).where(Nic.device_id == device.id)).all()
         assert len(nics) == 2  # eth1 kept
         assert result["applied"] == []
@@ -184,7 +184,7 @@ def test_history_kept_after_device_delete(engine):
     """change_history survives a hard device delete (delete FK child tables first, then the device)"""
     with Session(engine) as session:
         pending = setup_conflict(
-            session, mgmt={"mac": "AA:BB:CC:DD:EE:01", "ip": "192.168.10.200",
+            session, mgmt={"mac": "02:00:00:00:00:01", "ip": "192.0.2.12",
                            "prefix_length": 24}
         )
         apply_resolution(session, pending, {"mgmt.ip": "new"}, {})

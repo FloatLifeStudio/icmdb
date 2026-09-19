@@ -24,6 +24,7 @@
 - [User login](#9-user-login)
 - [User management](#10-user-management)
 - [Operation audit](#11-operation-audit)
+- [API keys](#12-api-keys)
 
 ---
 
@@ -50,29 +51,29 @@ Collectors push device data. Matching is by hostname, with three outcomes:
     "full_sync": true
   },
   "os": {
-    "hostname": "S1A01DC-VL101",
+    "hostname": "demo-node-01",
     "type": "Linux",
     "version": "Ubuntu 22.04",
     "kernel": "5.15.0-91-generic",
     "virt": "bare_metal"
   },
   "mgmt": {
-    "mac": "AA:BB:CC:DD:EE:01",
-    "ip": "192.168.10.101",
+    "mac": "02:00:00:00:00:01",
+    "ip": "192.0.2.11",
     "prefix_length": 24
   },
   "hardware": {
-    "chassis_serial_number": "PF4ABC123456",
+    "chassis_serial_number": "DEMO-SN-0001",
     "nics": [
       {
         "name": "eth0",
-        "mac": "AA:BB:CC:DD:EE:02",
-        "ips": [{"ip": "10.10.1.101", "prefix_length": 24}]
+        "mac": "02:00:00:00:00:02",
+        "ips": [{"ip": "198.51.100.11", "prefix_length": 24}]
       },
       {
         "name": "eth1",
-        "mac": "AA:BB:CC:DD:EE:03",
-        "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]
+        "mac": "02:00:00:00:00:03",
+        "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]
       }
     ],
     "memory": {
@@ -85,7 +86,7 @@ Collectors push device data. Matching is by hostname, with three outcomes:
           "size": 64,
           "size_unit": "GB",
           "speed_mts": 4800,
-          "serial_number": "123123456"
+          "serial_number": "DEMO-MEM-01"
         }
       ]
     },
@@ -94,21 +95,21 @@ Collectors push device data. Matching is by hostname, with three outcomes:
       {"slot": "CPU1", "model": "Intel(R) Xeon(R) Gold 6448Y"}
     ],
     "disks": [
-      {"serial_number": "123123123", "type": "SSD", "manufacturer": "Samsung",
+      {"serial_number": "DEMO-SN-0010", "type": "SSD", "manufacturer": "Samsung",
        "model": "990EVO", "size": 8, "size_unit": "TB"},
-      {"serial_number": "123456", "type": "HDD", "manufacturer": "HGST",
+      {"serial_number": "DEMO-SN-0011", "type": "HDD", "manufacturer": "HGST",
        "model": "HUH728080ALE604", "size": 8, "size_unit": "TB"}
     ],
     "psus": [
-      {"serial_number": "2P0123123132", "manufacturer": "GreatWall",
+      {"serial_number": "DEMO-SN-0005", "manufacturer": "GreatWall",
        "model": "CRPS2700D2", "max_power_w": 2700}
     ],
     "gpu": {
       "slots": [
         {
-          "uuid": "GPU-3f2a1b9c-8d4e-4f6a-b7c8-9a1b2c3d4e5f",
+          "uuid": "GPU-00000000-0000-0000-0000-9a1b2c3d4e5f",
           "name": "NVIDIA GeForce RTX 4090",
-          "serial_number": "G123456",
+          "serial_number": "DEMO-GPU-0001",
           "size": 24,
           "size_unit": "GB",
           "driver_version": "550.54.14",
@@ -157,7 +158,7 @@ legacy memory `size_gb` → `size` + `GB`). New collectors should always push th
 **curl example**:
 
 ```bash
-curl -X POST http://192.168.201.18:8080/api/v1/devices \
+curl -X POST http://<host>:8080/api/v1/devices \
   -H "Content-Type: application/json" \
   -d @collector.json
 ```
@@ -191,7 +192,7 @@ On `diff_created`, `pending_change_id` is the pending-change record id, which ca
 | `sort_order` | `asc` | `asc` / `desc` |
 
 ```bash
-curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
+curl "http://<host>:8080/api/v1/devices?page=1&search=demo&status=active"
 ```
 
 **Response**:
@@ -204,10 +205,10 @@ curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
   "items": [
     {
       "id": 1,
-      "hostname": "S1A01DC-VL101",
-      "serial_number": "PF4ABC123456",
-      "mgmt_mac": "AA:BB:CC:DD:EE:01",
-      "mgmt_ip": "192.168.10.101",
+      "hostname": "demo-node-01",
+      "serial_number": "DEMO-SN-0001",
+      "mgmt_mac": "02:00:00:00:00:01",
+      "mgmt_ip": "192.0.2.11",
       "mgmt_prefix_length": 24,
       "last_pushed_at": "2026-09-11T08:43:39",
       "created_at": "2026-09-11T08:43:39",
@@ -217,8 +218,8 @@ curl "http://192.168.201.18:8080/api/v1/devices?page=1&search=S1A&status=active"
         {
           "id": 1,
           "name": "eth0",
-          "mac": "AA:BB:CC:DD:EE:02",
-          "ips": [{"id": 1, "ip": "10.10.1.101", "prefix_length": 24}]
+          "mac": "02:00:00:00:00:02",
+          "ips": [{"id": 1, "ip": "198.51.100.11", "prefix_length": 24}]
         }
       ]
     }
@@ -237,7 +238,7 @@ The response structure is the same as a list item. Returns 404 if the device doe
 Hard-deletes the device and its NIC, memory, CPU, disk, PSU and GPU data (pending-change records are deleted along with it); **change history is preserved**. Returns 204 on success.
 
 ```bash
-curl -X DELETE http://192.168.201.18:8080/api/v1/devices/1
+curl -X DELETE http://<host>:8080/api/v1/devices/1
 ```
 
 ---
@@ -249,7 +250,7 @@ curl -X DELETE http://192.168.201.18:8080/api/v1/devices/1
 **Query parameters**: `status` defaults to `pending`; `all` shows everything including handled records (applied / discarded).
 
 ```bash
-curl "http://192.168.201.18:8080/api/v1/pending-changes"
+curl "http://<host>:8080/api/v1/pending-changes"
 ```
 
 **Response** (`diff` is the field-level diff list):
@@ -264,15 +265,15 @@ curl "http://192.168.201.18:8080/api/v1/pending-changes"
       "payload": {"...": "raw push JSON, same structure as the POST /devices request body"},
       "diff": {
         "fields": [
-          {"field": "mgmt.ip", "old": "192.168.10.101", "new": "192.168.10.200"}
+          {"field": "mgmt.ip", "old": "192.0.2.11", "new": "192.0.2.12"}
         ],
         "nics": [
           {
             "name": "eth1",
             "kind": "removed",
             "changes": [],
-            "old": {"name": "eth1", "mac": "AA:BB:CC:DD:EE:03",
-                    "ips": [{"ip": "10.10.2.101", "prefix_length": 24}]},
+            "old": {"name": "eth1", "mac": "02:00:00:00:00:03",
+                    "ips": [{"ip": "198.51.100.13", "prefix_length": 24}]},
             "new": null
           }
         ],
@@ -312,9 +313,9 @@ Choose `new` (adopt the new data) or `old` (keep the current state) for each ent
   "nic_choices": {"eth1": "new", "eth2": "old"},
   "memory_choices": {"DIMM_A1": "new"},
   "cpu_choices": {"CPU0": "new"},
-  "disk_choices": {"123123123": "new"},
-  "psu_choices": {"2P0123123132": "new"},
-  "gpu_choices": {"GPU-3f2a1b9c": "new"}
+  "disk_choices": {"DEMO-SN-0010": "new"},
+  "psu_choices": {"DEMO-SN-0005": "new"},
+  "gpu_choices": {"GPU-demo-0001": "new"}
 }
 ```
 
@@ -332,7 +333,7 @@ Choose `new` (adopt the new data) or `old` (keep the current state) for each ent
 
 ```json
 {
-  "applied": ["mgmt.ip: 192.168.10.101 -> 192.168.10.200", "nic eth1 deleted"],
+  "applied": ["mgmt.ip: 192.0.2.11 -> 192.0.2.12", "nic eth1 deleted"],
   "pending_id": 1,
   "status": "applied"
 }
@@ -350,7 +351,7 @@ Resolving an already-handled record again returns 409.
 **Query parameters**: `device_id` is optional, filtering by device. A device's history remains queryable even after a hard delete.
 
 ```bash
-curl "http://192.168.201.18:8080/api/v1/change-history?device_id=1"
+curl "http://<host>:8080/api/v1/change-history?device_id=1"
 ```
 
 **Response**:
@@ -361,7 +362,7 @@ curl "http://192.168.201.18:8080/api/v1/change-history?device_id=1"
     {
       "id": 1,
       "device_id": 1,
-      "summary": "mgmt.ip: 192.168.10.101 -> 192.168.10.200; nic eth1 deleted",
+      "summary": "mgmt.ip: 192.0.2.11 -> 192.0.2.12; nic eth1 deleted",
       "source": "collector",
       "diff": {"...": "full diff at resolution time, same structure as the pending-changes diff"},
       "created_at": "2026-09-11T08:43:57"
@@ -383,7 +384,7 @@ Contains the full diff at resolution time.
 Asset overview statistics: totals, active / suspected offline, pending-change count, and the 10 most recent changes.
 
 ```bash
-curl "http://192.168.201.18:8080/api/v1/dashboard"
+curl "http://<host>:8080/api/v1/dashboard"
 ```
 
 ```json
@@ -410,7 +411,7 @@ the location/owner/purpose metadata. `Content-Disposition: attachment`.
 Uploaded as `multipart/form-data` with the field name `file`; the row format matches the export (so it can be imported back directly).
 
 ```bash
-curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
+curl -X POST http://<host>:8080/api/v1/devices/import/csv \
   -F "file=@devices.csv"
 ```
 
@@ -474,12 +475,13 @@ Key-values are stored in the systemsetting table, with environment variables as 
 
 ### `GET /api/v1/settings/system`
 
-Returns `{"offline_threshold_hours": 24}` (the suspected-offline threshold, in hours).
+Returns `{"offline_threshold_hours": 24, "api_key_enabled": false}` (the suspected-offline threshold in hours + the API key feature toggle).
 
 ### `PUT /api/v1/settings/system`
 
-Admin only (others get 403). Request body `{"offline_threshold_hours": 24}`, value range 1 ~ 8760;
-invalid values get 422.
+Admin only (others get 403). Request body `{"offline_threshold_hours": 24, "api_key_enabled": false}`,
+threshold value range 1 ~ 8760, invalid values get 422; `api_key_enabled` is optional and kept unchanged when omitted.
+When enabled, collector pushes must carry a valid key (see [API keys](#12-api-keys)).
 
 ## 9. User Login
 
@@ -556,6 +558,7 @@ Cannot delete yourself or the last admin (409).
 | Resolve / delete device / batch delete | ✅ | ❌ 403 |
 | Edit tags / edit device info / CSV import | ✅ | ❌ |
 | User management / operation log | ✅ | ❌ |
+| API key management | ✅ | ❌ |
 
 ## 11. Operation Audit
 
@@ -573,6 +576,55 @@ An optional `username` query parameter filters by operator, and `limit` caps the
 ```
 
 Sorted by time descending; viewer access returns 403.
+
+## 12. API Keys
+
+API keys are for **collector push + read-only API access**, closing the "forged pushes have no gate" gap:
+
+- Format `cmdb_` + 32 hex chars; the full key is stored (viewable/copyable anytime) with a 12-char prefix for identification
+- Permissions: with a key, `POST /devices` (push) and any `GET` are allowed; **all other writes and the key management endpoints return 403** — the blast radius of a leaked key stays contained
+- Default **off** (system setting `api_key_enabled`): nothing changes, push stays open and the session cookie flow is untouched
+- When on: `POST /devices` requires a valid key, missing or invalid returns 401; requests with `X-API-Key` are handled under key permissions (checked before the session cookie); each request refreshes the key's last_used_at
+- Revocation (delete) takes effect immediately; requests using the key get 401 right away; creation and revocation are both audited
+- Key management is admin-only (others get 403)
+
+### `GET /api/v1/api-keys`
+
+Returns all keys (**including the full key value**, copyable anytime):
+
+```json
+{"items": [{"id": 1, "name": "iagent-prod", "key": "cmdb_a1b2c3...",
+            "prefix": "cmdb_a1b2c3", "created_at": "...", "last_used_at": "..."}]}
+```
+
+### `POST /api/v1/api-keys`
+
+```json
+{"name": "iagent-prod"}
+```
+
+Returns the newly created key (including the full key value); a blank name returns 422. Name keys per collector/source so they can be revoked individually.
+
+### `DELETE /api/v1/api-keys/{id}` — revoke a key
+
+Returns `{"ok": true}`; a nonexistent key returns 404.
+
+### curl usage
+
+Push (once `api_key_enabled` is on, the key is required):
+
+```bash
+curl -X POST http://<host>:8080/api/v1/devices \
+  -H "X-API-Key: cmdb_<your-key>" \
+  -H "Content-Type: application/json" \
+  -d @tests/data/collector_example_full.json
+```
+
+Read-only GET works the same way:
+
+```bash
+curl -H "X-API-Key: cmdb_<your-key>" http://<host>:8080/api/v1/devices
+```
 
 ## Appendix: Configuration (environment variables)
 
