@@ -155,7 +155,7 @@ Vue 3 前端(构建产物由 FastAPI 托管,单服务单端口 8080)
 | `memory.slots[]` | list | 内存,`slot` 为身份 | `memoryslot` 表 |
 | `memory.slots[].slot` | string,可空 | �位号(DIMM_A1),null 自动丢弃 | `memoryslot.slot` |
 | `...manufacturer` / `part_number` | string,可空 | 厂商 / 型号颗粒 | 同表同名列 |
-| `...type` | string,可空 | 内存代数(DDR4...) | 同表同名列 |
+| `...type` | string,可空 | 内存类型(DDR4/DDR5...) | 同表同名列 |
 | `...size` / `size_unit` | int + string,可空 | 标称容量(32 GB / 64 GB) | 同表同名列 + `size_gb` 归一化列 |
 | `...speed_mts` | int,可空 | 频率(MT/s) | `memoryslot.speed_mts` |
 | `...serial_number` | string,可空 | 内存条 SN(可与同 SN 硬盘区分,作用域在表内) | 同表同名列 |
@@ -221,7 +221,7 @@ IP 单独一张表:一台网卡可有多个 IP(IPv4/IPv6、多地址),一对多�
 
 ### 3.3 `memoryslot` — 内存槽位
 
-id、`device_id`(FK+索引)、`slot`(身份,唯一约束 device_id+slot)、`manufacturer`、`part_number`、`type`(内存代数)、`size` + `size_unit`(标称原始值)、`size_gb`(归一化列,TB×1024,便于排序统计)、`speed_mts`、`serial_number`。
+id、`device_id`(FK+索引)、`slot`(身份,唯一约束 device_id+slot)、`manufacturer`、`part_number`、`type`(内存类型,DDR4/DDR5)、`size` + `size_unit`(标称原始值)、`size_gb`(归一化列,TB×1024,便于排序统计)、`speed_mts`、`serial_number`。
 
 ### 3.4 `cpu` — CPU 槽位
 

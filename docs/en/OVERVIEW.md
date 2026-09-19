@@ -155,7 +155,7 @@ Push → hostname matched against devices in the DB
 | `memory.slots[]` | list | Memory, `slot` is the identity | `memoryslot` table |
 | `memory.slots[].slot` | string, nullable | Slot number (DIMM_A1), null entries are dropped automatically | `memoryslot.slot` |
 | `...manufacturer` / `part_number` | string, nullable | Manufacturer / part number | Same table, same-named column |
-| `...type` | string, nullable | Memory generation (DDR4...) | Same table, same-named column |
+| `...type` | string, nullable | Memory type (DDR4/DDR5...) | Same table, same-named column |
 | `...size` / `size_unit` | int + string, nullable | Nominal capacity (32 GB / 64 GB) | Same table, same-named column + normalized `size_gb` column |
 | `...speed_mts` | int, nullable | Frequency (MT/s) | `memoryslot.speed_mts` |
 | `...serial_number` | string, nullable | DIMM SN (can be distinguished from a disk with the same SN; the scope is per table) | Same table, same-named column |
@@ -221,7 +221,7 @@ IPs get their own table: one NIC can have multiple IPs (IPv4/IPv6, multiple addr
 
 ### 3.3 `memoryslot` — memory slots
 
-id, `device_id` (FK+index), `slot` (identity, unique constraint device_id+slot), `manufacturer`, `part_number`, `type` (memory generation), `size` + `size_unit` (nominal raw value), `size_gb` (normalized column, TB×1024, for easy sorting and statistics), `speed_mts`, `serial_number`.
+id, `device_id` (FK+index), `slot` (identity, unique constraint device_id+slot), `manufacturer`, `part_number`, `type` (memory type, DDR4/DDR5), `size` + `size_unit` (nominal raw value), `size_gb` (normalized column, TB×1024, for easy sorting and statistics), `speed_mts`, `serial_number`.
 
 ### 3.4 `cpu` — CPU slots
 

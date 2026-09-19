@@ -135,7 +135,7 @@ Collectors push device data. Matching is by hostname, with three outcomes:
 | `mgmt` | ❌ | Management-port info: mac / ip / prefix_length |
 | `hardware.chassis_serial_number` | ❌ | Chassis serial number; not collected does not clear existing values in the DB |
 | `hardware.nics` | ❌ | NIC array, however many are pushed is how many are stored; `name` is the NIC identity |
-| `hardware.memory` | ❌ | Memory info: `slots` array, `slot` is the identity; fields include manufacturer / part_number / type (generation) / size + size_unit (nominal capacity, GB or TB) / speed_mts (MT/s) / serial_number |
+| `hardware.memory` | ❌ | Memory info: `slots` array, `slot` is the identity; fields include manufacturer / part_number / type (DDR4/DDR5) / size + size_unit (nominal capacity, GB or TB) / speed_mts (MT/s) / serial_number |
 | `hardware.cpus` | ❌ | CPU array, `slot` is the identity; fields include model |
 | `hardware.disks` | ❌ | Disk array, `serial_number` is the identity; fields include type (SSD/HDD) / manufacturer / model / size + size_unit (nominal capacity) |
 | `hardware.psus` | ❌ | PSU array, `serial_number` is the identity; fields include manufacturer / model / max_power_w (max power in W) |

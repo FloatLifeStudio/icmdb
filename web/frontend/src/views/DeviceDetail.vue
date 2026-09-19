@@ -100,7 +100,7 @@
         <el-table-column resizable prop="part_number" label="型号" :min-width="memoryWidths.part_number" show-overflow-tooltip>
           <template #default="{ row }">{{ row.part_number || '-' }}</template>
         </el-table-column>
-        <el-table-column resizable prop="type" label="代数" :min-width="memoryWidths.type" show-overflow-tooltip>
+        <el-table-column resizable prop="type" label="类型" :min-width="memoryWidths.type" show-overflow-tooltip>
           <template #default="{ row }">{{ row.type || '-' }}</template>
         </el-table-column>
         <el-table-column resizable label="容量" :min-width="memoryWidths.size" show-overflow-tooltip>
@@ -241,7 +241,7 @@ const memoryWidths = computed(() =>
     { key: 'slot', label: '槽位' },
     { key: 'manufacturer', label: '厂商' },
     { key: 'part_number', label: '型号' },
-    { key: 'type', label: '代数' },
+    { key: 'type', label: '类型' },
     { key: 'size', label: '容量', text: (r) => (r.size ? `${r.size}${r.size_unit ?? ''}` : '-') },
     { key: 'speed_mts', label: '频率', text: (r) => (r.speed_mts ? `${r.speed_mts}MT/s` : '-') },
     { key: 'serial_number', label: 'SN' },

@@ -135,7 +135,7 @@
 | `mgmt` | ❌ | 管理口信息:mac / ip / prefix_length |
 | `hardware.chassis_serial_number` | ❌ | 机箱序列号;未采集不清空库中已有值 |
 | `hardware.nics` | ❌ | 网卡数组,推多少收多少;`name` 是网卡身份 |
-| `hardware.memory` | ❌ | 内存信息:`slots` 数组,`slot` 是身份;字段含 manufacturer / part_number / type(代数)/ size + size_unit(理论容量,GB 或 TB)/ speed_mts(MT/s)/ serial_number |
+| `hardware.memory` | ❌ | 内存信息:`slots` 数组,`slot` 是身份;字段含 manufacturer / part_number / type(类型,DDR4/DDR5)/ size + size_unit(理论容量,GB 或 TB)/ speed_mts(MT/s)/ serial_number |
 | `hardware.cpus` | ❌ | CPU 数组,`slot` 是身份;字段含 model(型号) |
 | `hardware.disks` | ❌ | 硬盘数组,`serial_number` 是身份;字段含 type(SSD/HDD)/ manufacturer / model / size + size_unit(理论容量) |
 | `hardware.psus` | ❌ | 电源数组,`serial_number` 是身份;字段含 manufacturer / model / max_power_w(最大功率 W) |
