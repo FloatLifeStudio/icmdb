@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from cmdb.api.auth import SESSION_COOKIE, hash_password, token_username
+from cmdb.api.auth import current_username, hash_password
 from cmdb.database import get_session
+from cmdb.services.audit import record_audit
 from cmdb.models import User
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -28,10 +29,6 @@ def _admin_count(session: Session) -> int:
     )
 
 
-def _current_username(request: Request) -> str | None:
-    return token_username(request.cookies.get(SESSION_COOKIE))
-
-
 class UserIn(BaseModel):
     username: str
     password: str
@@ -50,7 +47,9 @@ def list_users(session: Session = Depends(get_session)):
 
 
 @router.post("")
-def create_user(body: UserIn, session: Session = Depends(get_session)):
+def create_user(
+    body: UserIn, request: Request, session: Session = Depends(get_session)
+):
     """新增用户。"""
     if body.role not in _ROLES:
         raise HTTPException(status_code=422, detail=f"role 只能是 {' / '.join(_ROLES)}")
@@ -67,6 +66,10 @@ def create_user(body: UserIn, session: Session = Depends(get_session)):
         role=body.role,
     )
     session.add(user)
+    record_audit(
+        session, current_username(request), "创建用户",
+        f"{user.username} ({user.role})",
+    )
     session.commit()
     session.refresh(user)
     return _to_out(user)
@@ -74,7 +77,10 @@ def create_user(body: UserIn, session: Session = Depends(get_session)):
 
 @router.put("/{user_id}")
 def update_user(
-    user_id: int, body: UserUpdateIn, session: Session = Depends(get_session)
+    user_id: int,
+    body: UserUpdateIn,
+    request: Request,
+    session: Session = Depends(get_session),
 ):
     """重置密码 / 修改角色。"""
     user = session.get(User, user_id)
@@ -91,6 +97,15 @@ def update_user(
     if body.password:
         user.password_hash = hash_password(body.password)
     session.add(user)
+    changes = []
+    if body.role is not None:
+        changes.append(f"role -> {body.role}")
+    if body.password:
+        changes.append("重置密码")
+    record_audit(
+        session, current_username(request), "更新用户",
+        f"{user.username} {', '.join(changes)}",
+    )
     session.commit()
     session.refresh(user)
     return _to_out(user)
@@ -100,11 +115,14 @@ def update_user(
 def delete_user(user_id: int, request: Request, session: Session = Depends(get_session)):
     """删除用户;不能删除自己与最后一个管理员。"""
     if user := session.get(User, user_id):
-        if user.username == _current_username(request):
+        if user.username == current_username(request):
             raise HTTPException(status_code=409, detail="不能删除自己的账号")
         if user.role == "admin" and _admin_count(session) == 1:
             raise HTTPException(status_code=409, detail="不能删除最后一个管理员账号")
         session.delete(user)
+        record_audit(
+            session, current_username(request), "删除用户", user.username
+        )
         session.commit()
         return {"ok": True}
     raise HTTPException(status_code=404, detail="用户不存在")

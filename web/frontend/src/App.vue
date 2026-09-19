@@ -25,6 +25,9 @@
         <el-menu-item v-if="role === 'admin'" index="/settings">
           <el-icon><Setting /></el-icon>系统设置
         </el-menu-item>
+        <el-menu-item v-if="role === 'admin'" index="/audit-logs">
+          <el-icon><Tickets /></el-icon>操作日志
+        </el-menu-item>
       </el-menu>
       <div class="user">
         <span class="username">{{ username }}</span>
@@ -67,7 +70,7 @@ body {
 import { provide, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
-import { Monitor, EditPen, Odometer, Setting, User } from '@element-plus/icons-vue'
+import { Monitor, EditPen, Odometer, Setting, Tickets, User } from '@element-plus/icons-vue'
 import { api } from './api'
 
 const route = useRoute()

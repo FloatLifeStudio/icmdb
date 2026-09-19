@@ -73,6 +73,9 @@ export interface DeviceOut {
   os_virt: string | null
   kernel: string | null
   agent_version: string | null
+  location: string | null
+  owner: string | null
+  purpose: string | null
   mgmt_mac: string | null
   mgmt_ip: string | null
   mgmt_prefix_length: number | null
@@ -184,6 +187,20 @@ export interface SystemSettings {
   offline_threshold_hours: number
 }
 
+export interface AuditLogRow {
+  id: number
+  username: string | null
+  action: string
+  detail: string | null
+  created_at: string
+}
+
+export interface MetadataIn {
+  location?: string | null
+  owner?: string | null
+  purpose?: string | null
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
   if (!res.ok) {
@@ -247,6 +264,12 @@ export const api = {
       json('PUT', { tags }),
     ),
 
+  updateMetadata: (id: number, body: MetadataIn) =>
+    request<{ device_id: number; location: string | null; owner: string | null; purpose: string | null }>(
+      `${BASE}/devices/${id}/metadata`,
+      json('PUT', body),
+    ),
+
   exportCsvUrl: () => `${BASE}/devices/export/csv`,
 
   importCsvUrl: () => `${BASE}/devices/import/csv`,
@@ -294,4 +317,9 @@ export const api = {
 
   updateSystemSettings: (body: SystemSettings) =>
     request<SystemSettings>(`${BASE}/settings/system`, json('PUT', body)),
+
+  listAuditLogs: (username = '') => {
+    const qs = username ? `?username=${encodeURIComponent(username)}` : ''
+    return request<{ items: AuditLogRow[] }>(`${BASE}/audit-logs${qs}`)
+  },
 }

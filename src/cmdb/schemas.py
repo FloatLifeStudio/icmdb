@@ -276,6 +276,10 @@ class DeviceOut(BaseModel):
     kernel: str | None = None
     os_virt: str | None = None
     agent_version: str | None = None
+    # CMDB 元数据(UI 可编辑,推送不改)
+    location: str | None = None
+    owner: str | None = None
+    purpose: str | None = None
     mgmt_mac: str | None = None
     mgmt_ip: str | None = None
     mgmt_prefix_length: int | None = None
@@ -321,6 +325,14 @@ class TagUpdate(BaseModel):
     """标签更新:全量替换为给定标签列表。"""
 
     tags: list[str] = []
+
+
+class MetadataIn(BaseModel):
+    """设备元数据更新(位置/负责人/用途):None = 不改,空串 = 清空。"""
+
+    location: str | None = None
+    owner: str | None = None
+    purpose: str | None = None
 
 
 class BatchDeleteIn(BaseModel):

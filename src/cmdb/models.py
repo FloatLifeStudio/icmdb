@@ -33,6 +33,10 @@ class Device(SQLModel, table=True):
     kernel: str | None = None
     os_virt: str | None = None
     agent_version: str | None = None
+    # CMDB 元数据(UI 可编辑,推送不改)
+    location: str | None = None
+    owner: str | None = None
+    purpose: str | None = None
     last_pushed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
@@ -212,3 +216,13 @@ class SystemSetting(SQLModel, table=True):
     key: str = Field(unique=True, index=True)
     value: str
     updated_at: datetime = Field(default_factory=utcnow)
+
+
+class AuditLog(SQLModel, table=True):
+    """操作审计日志:记录用户的管理操作(删除/裁决/用户管理/设置修改等)。"""
+
+    id: int | None = Field(default=None, primary_key=True)
+    username: str | None = Field(default=None, index=True)
+    action: str = Field(index=True)
+    detail: str | None = None
+    created_at: datetime = Field(default_factory=utcnow, index=True)

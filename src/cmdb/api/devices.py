@@ -5,11 +5,12 @@ import io
 import re
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, Body, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, Body, File, HTTPException, Request, Response, UploadFile
 from pydantic import ValidationError
 from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
+from cmdb.api.auth import current_username
 from cmdb.database import get_session
 from cmdb.models import (
     Cpu,
@@ -25,6 +26,7 @@ from cmdb.models import (
     utcnow,
 )
 from cmdb.schemas import (
+    MetadataIn,
     AgentInfo,
     BatchDeleteIn,
     CpuSlotOut,
@@ -48,6 +50,7 @@ from cmdb.schemas import (
     normalise_legacy,
 )
 from cmdb.api.settings import get_offline_threshold_hours
+from cmdb.services.audit import record_audit
 from cmdb.services.ingest import ingest_push
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -224,6 +227,9 @@ def _to_out(
         os_virt=device.os_virt,
         kernel=device.kernel,
         agent_version=device.agent_version,
+        location=device.location,
+        owner=device.owner,
+        purpose=device.purpose,
         mgmt_mac=device.mgmt_mac,
         mgmt_ip=device.mgmt_ip,
         mgmt_prefix_length=device.mgmt_prefix_length,
@@ -364,7 +370,9 @@ def get_device(device_id: int, session: Session = Depends(get_session)):
 
 
 @router.delete("/{device_id}", status_code=204)
-def delete_device(device_id: int, session: Session = Depends(get_session)):
+def delete_device(
+    device_id: int, request: Request, session: Session = Depends(get_session)
+):
     """手工删除设备:硬删设备与网卡数据,change_history 保留。"""
     device = session.get(Device, device_id)
     if device is None:
@@ -372,11 +380,14 @@ def delete_device(device_id: int, session: Session = Depends(get_session)):
 
     _delete_device_children(session, device_id)
     session.delete(device)
+    record_audit(session, current_username(request), "删除设备", device.hostname)
     session.commit()
 
 
 @router.post("/batch-delete")
-def batch_delete(body: BatchDeleteIn, session: Session = Depends(get_session)):
+def batch_delete(
+    body: BatchDeleteIn, request: Request, session: Session = Depends(get_session)
+):
     """批量删除设备:硬删,行为同单个删除。"""
     deleted = []
     for device_id in body.ids:
@@ -386,13 +397,14 @@ def batch_delete(body: BatchDeleteIn, session: Session = Depends(get_session)):
         _delete_device_children(session, device_id)
         session.delete(device)
         deleted.append(device_id)
+    record_audit(session, current_username(request), "批量删除设备", f"{len(deleted)} 台")
     session.commit()
     return {"deleted": deleted}
 
 
 @router.put("/{device_id}/tags")
 def update_tags(
-    device_id: int, body: TagUpdate, session: Session = Depends(get_session)
+    device_id: int, body: TagUpdate, request: Request, session: Session = Depends(get_session)
 ):
     """更新设备标签(全量替换)。"""
     device = session.get(Device, device_id)
@@ -401,9 +413,33 @@ def update_tags(
     tags = list(dict.fromkeys(t.strip() for t in body.tags if t.strip()))
     _replace_tags(session, device_id, tags)
     device.updated_at = utcnow()
-    session.add(device)
+    record_audit(session, current_username(request), "更新标签", device.hostname)
     session.commit()
     return {"device_id": device_id, "tags": tags}
+
+
+@router.put("/{device_id}/metadata")
+def update_metadata(
+    device_id: int,
+    body: MetadataIn,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """更新设备元数据(机房/机柜位置、负责人、用途;推送不改,仅 UI 编辑)。"""
+    device = session.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    if body.location is not None:
+        device.location = body.location.strip() or None
+    if body.owner is not None:
+        device.owner = body.owner.strip() or None
+    if body.purpose is not None:
+        device.purpose = body.purpose.strip() or None
+    device.updated_at = utcnow()
+    record_audit(session, current_username(request), "更新设备信息", device.hostname)
+    session.add(device)
+    session.commit()
+    return {"device_id": device_id, "location": device.location, "owner": device.owner, "purpose": device.purpose}
 
 
 @router.get("/export/csv")
@@ -414,8 +450,8 @@ def export_csv(session: Session = Depends(get_session)):
     writer.writerow(
         ["hostname", "serial_number", "os_type", "os_version", "os_virt",
          "kernel", "agent_version", "mgmt_mac", "mgmt_ip",
-         "mgmt_prefix_length", "tags", "status", "last_pushed_at", "nics",
-         "gpu"]
+         "mgmt_prefix_length", "tags", "location", "owner", "purpose",
+         "status", "last_pushed_at", "nics", "gpu"]
     )
     for d in session.exec(select(Device).order_by(Device.hostname)).all():
         nics = session.exec(select(Nic).where(Nic.device_id == d.id)).all()
@@ -447,6 +483,9 @@ def export_csv(session: Session = Depends(get_session)):
                 d.mgmt_ip or "",
                 d.mgmt_prefix_length if d.mgmt_prefix_length is not None else "",
                 ",".join(_device_tags_by_id(session, d.id)),
+                d.location or "",
+                d.owner or "",
+                d.purpose or "",
                 _device_status(d, _offline_threshold(session)),
                 d.last_pushed_at.isoformat() if d.last_pushed_at else "",
                 " | ".join(nic_parts),
@@ -521,7 +560,7 @@ def _gpus_from_csv(gpus_str: str | None) -> list[GpuSlotIn]:
 
 @router.post("/import/csv")
 async def import_csv(
-    file: UploadFile = File(...), session: Session = Depends(get_session)
+    request: Request, file: UploadFile = File(...), session: Session = Depends(get_session)
 ):
     """CSV 批量导入:逐行走与推送相同的清洗逻辑(hostname 匹配、diff 进待裁决)。
 
@@ -559,14 +598,28 @@ async def import_csv(
         result = ingest_push(session, push, utcnow(), update_last_pushed=False)
         summary[result["result"]] += 1
 
-        # 标签随导入设置(CMDB 元数据,不走推送清洗)
+        # 标签与元数据随导入设置(CMDB 元数据,不走推送清洗)
+        meta = {
+            key: (row.get(key) or "").strip()
+            for key in ("location", "owner", "purpose")
+        }
         tags = _split_tags(row.get("tags"))
-        if tags:
+        if tags or any(meta.values()):
             device = session.exec(
                 select(Device).where(Device.hostname == hostname)
             ).first()
             if device is not None:
-                _replace_tags(session, device.id, tags)
+                if tags:
+                    _replace_tags(session, device.id, tags)
+                for key, val in meta.items():
+                    if val:
+                        setattr(device, key, val)
 
+    record_audit(
+        session,
+        current_username(request),
+        "CSV 导入",
+        f"新增 {summary['created']},未变化 {summary['unchanged']},进待裁决 {summary['diff_created']}",
+    )
     session.commit()
     return summary

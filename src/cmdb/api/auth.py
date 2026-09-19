@@ -9,7 +9,7 @@ import hmac
 import secrets
 import time
 
-from fastapi import APIRouter, Cookie, HTTPException, Response
+from fastapi import APIRouter, Cookie, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -47,6 +47,11 @@ def _make_token(username: str) -> str:
     expires = int(time.time()) + settings.session_expire_days * 86400
     payload = f"{expires}:{username}"
     return f"{payload}:{_sign(payload)}"
+
+
+def current_username(request: Request) -> str | None:
+    """从请求 cookie 取当前登录用户名。"""
+    return token_username(request.cookies.get(SESSION_COOKIE))
 
 
 def token_username(token: str | None) -> str | None:

@@ -40,6 +40,9 @@ _MIGRATIONS = {
         "os_virt": "VARCHAR",
         "kernel": "VARCHAR",
         "agent_version": "VARCHAR",
+        "location": "VARCHAR",
+        "owner": "VARCHAR",
+        "purpose": "VARCHAR",
     },
 }
 

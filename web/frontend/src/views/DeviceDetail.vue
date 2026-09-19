@@ -17,7 +17,7 @@
       <template #header>
         <div class="card-header">
           <span>基本信息</span>
-          <el-button v-if="isAdmin" size="small" @click="openTagEdit">编辑标签</el-button>
+          <el-button v-if="isAdmin" size="small" @click="openMetaEdit">编辑信息</el-button>
         </div>
       </template>
       <el-descriptions :column="3" border>
@@ -56,6 +56,15 @@
             {{ t }}
           </el-tag>
           <span v-if="!device.tags.length">-</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="位置">
+          {{ device.location || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="负责人">
+          {{ device.owner || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="用途">
+          {{ device.purpose || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="上次推送">
           {{ fmt(device.last_pushed_at) }}
@@ -213,15 +222,27 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="tagDialogVisible" title="编辑标签" width="400px">
-      <el-input
-        v-model="tagInput"
-        placeholder="多个标签用英文逗号分隔,如:生产,web"
-        @keyup.enter="saveTags"
-      />
+    <el-dialog v-model="metaDialogVisible" title="编辑信息" width="420px">
+      <el-form label-width="80">
+        <el-form-item label="标签">
+          <el-input
+            v-model="tagInput"
+            placeholder="多个标签用英文逗号分隔,如:生产,web"
+          />
+        </el-form-item>
+        <el-form-item label="位置">
+          <el-input v-model="metaInput.location" placeholder="机房/机柜位置" />
+        </el-form-item>
+        <el-form-item label="负责人">
+          <el-input v-model="metaInput.owner" placeholder="负责人" />
+        </el-form-item>
+        <el-form-item label="用途">
+          <el-input v-model="metaInput.purpose" placeholder="用途" />
+        </el-form-item>
+      </el-form>
       <template #footer>
-        <el-button @click="tagDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveTags">保存</el-button>
+        <el-button @click="metaDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveMeta">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -244,8 +265,9 @@ const device = ref<DeviceOut | null>(null)
 const history = ref<HistoryRow[]>([])
 const loading = ref(false)
 const historyLoading = ref(false)
-const tagDialogVisible = ref(false)
+const metaDialogVisible = ref(false)
 const tagInput = ref('')
+const metaInput = ref({ location: '', owner: '', purpose: '' })
 const historyTable = ref<TableInstance>()
 
 // 列宽自适应:按各列最长内容算 min-width,默认刚好放下、完整显示
@@ -330,19 +352,33 @@ function fmt(ts: string | null): string {
   return new Date(utc).toLocaleString()
 }
 
-function openTagEdit() {
+function openMetaEdit() {
   tagInput.value = device.value?.tags.join(',') || ''
-  tagDialogVisible.value = true
+  metaInput.value = {
+    location: device.value?.location || '',
+    owner: device.value?.owner || '',
+    purpose: device.value?.purpose || '',
+  }
+  metaDialogVisible.value = true
 }
 
-async function saveTags() {
+async function saveMeta() {
   if (!device.value) return
   try {
     const tags = tagInput.value.split(',').map((t) => t.trim()).filter(Boolean)
     const res = await api.updateTags(device.value.id, tags)
     device.value.tags = res.tags
-    tagDialogVisible.value = false
-    ElMessage.success('标签已更新')
+    const meta = {
+      location: metaInput.value.location,
+      owner: metaInput.value.owner,
+      purpose: metaInput.value.purpose,
+    }
+    const metaRes = await api.updateMetadata(device.value.id, meta)
+    device.value.location = metaRes.location
+    device.value.owner = metaRes.owner
+    device.value.purpose = metaRes.purpose
+    metaDialogVisible.value = false
+    ElMessage.success('信息已更新')
   } catch (e) {
     ElMessage.error((e as Error).message)
   }

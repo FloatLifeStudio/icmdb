@@ -21,6 +21,7 @@
 - [系统设置](#8-系统设置)
 - [用户登录](#9-用户登录)
 - [用户管理](#10-用户管理)
+- [操作审计](#11-操作审计)
 
 ---
 
@@ -401,7 +402,8 @@ curl "http://192.168.201.18:8080/api/v1/dashboard"
 
 ### `GET /api/v1/devices/export/csv` — 导出 CSV
 
-导出全部设备,UTF-8 BOM(Excel 中文兼容)。`Content-Disposition: attachment`。
+导出全部设备,UTF-8 BOM(Excel 中文兼容),列含标签与
+location/owner/purpose 元数据。`Content-Disposition: attachment`。
 
 ### `POST /api/v1/devices/import/csv` — CSV 导入
 
@@ -413,8 +415,8 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 ```
 
 **行为**:逐行走与推送相同的清洗逻辑(hostname 匹配、diff 进待裁决),
-`source` 标记为 `csv_import`;标签随导入设置;不触碰 `last_pushed_at`
-(回导不会倒退最后推送时间)。
+`source` 标记为 `csv_import`;标签与 location/owner/purpose 元数据随导入设置;
+不触碰 `last_pushed_at`(回导不会倒退最后推送时间)。
 
 ```json
 {"created": 1, "unchanged": 0, "diff_created": 0, "errors": []}
@@ -429,6 +431,17 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 ```
 
 全量替换;标签为 CMDB 元数据,不属于采集数据。
+
+### `PUT /api/v1/devices/{id}/metadata` — 更新设备信息
+
+更新 CMDB 元数据(机房/机柜位置、负责人、用途),推送不改,仅 UI/导入编辑:
+
+```json
+{"location": "A栋-3F-01", "owner": "张三", "purpose": "web 服务"}
+```
+
+字段均可选:`None` = 不改,空串 = 清空;值首尾空白自动去除。
+返回 `{"device_id": 1, "location": "...", "owner": "...", "purpose": "..."}`。
 
 ### `POST /api/v1/devices/batch-delete` — 批量删除
 
@@ -541,8 +554,25 @@ curl -X POST http://192.168.201.18:8080/api/v1/devices/import/csv \
 | 采集推送(POST /devices,无需登录) | ✅ | ✅ |
 | 查看列表 / 详情 / 历史 / 仪表盘 | ✅ | ✅ |
 | 裁决 / 删除设备 / 批量删除 | ✅ | ❌ 403 |
-| 编辑标签 / CSV 导入 | ✅ | ❌ |
-| 用户管理 | ✅ | ❌ |
+| 编辑标签 / 编辑设备信息 / CSV 导入 | ✅ | ❌ |
+| 用户管理 / 操作日志 | ✅ | ❌ |
+
+## 11. 操作审计
+
+管理操作自动记录审计日志(随操作同一事务写入 auditlog 表):
+删除/批量删除设备、更新标签、更新设备信息、CSV 导入、裁决、用户增删改、
+修改系统设置。仅 admin 可查看。
+
+### `GET /api/v1/audit-logs`
+
+可选 `username` 查询参数按操作人过滤,`limit` 限制条数(默认 100,最大 1000):
+
+```json
+{"items": [{"id": 1, "username": "admin", "action": "删除设备",
+            "detail": "web-01", "created_at": "..."}]}
+```
+
+按时间倒序;viewer 访问返回 403。
 
 ## 附:配置项(环境变量)
 

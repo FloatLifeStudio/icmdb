@@ -686,3 +686,90 @@ def test_system_settings_viewer_forbidden(client):
     assert _login_as(client, "viewer1", "v1pass").status_code == 200
     assert client.get("/api/v1/settings/system").status_code == 200
     assert client.put("/api/v1/settings/system", json={"offline_threshold_hours": 48}).status_code == 403
+
+
+def test_device_metadata_update(client):
+    """PUT /metadata:机房/机柜位置、负责人、用途,None 不改,空串清空。"""
+    r = client.post("/api/v1/devices", json=make_push())
+    device_id = r.json()["device_id"]
+
+    # 默认为空
+    r = client.get(f"/api/v1/devices/{device_id}")
+    assert r.json()["location"] is None
+    assert r.json()["owner"] is None
+    assert r.json()["purpose"] is None
+
+    # 设置元数据
+    r = client.put(
+        f"/api/v1/devices/{device_id}/metadata",
+        json={"location": "A栋-3F-01", "owner": "张三", "purpose": "web 服务"},
+    )
+    assert r.status_code == 200
+    assert r.json()["location"] == "A栋-3F-01"
+    assert r.json()["owner"] == "张三"
+    assert r.json()["purpose"] == "web 服务"
+
+    # 推送不改元数据
+    client.post("/api/v1/devices", json=make_push())
+    r = client.get(f"/api/v1/devices/{device_id}")
+    assert r.json()["location"] == "A栋-3F-01"
+
+    # None 不改,空串清空
+    r = client.put(
+        f"/api/v1/devices/{device_id}/metadata",
+        json={"location": None, "owner": ""},
+    )
+    assert r.status_code == 200
+    r = client.get(f"/api/v1/devices/{device_id}")
+    assert r.json()["location"] == "A栋-3F-01"
+    assert r.json()["owner"] is None
+    assert r.json()["purpose"] == "web 服务"
+
+    # 不存在的设备 -> 404
+    r = client.put("/api/v1/devices/99999/metadata", json={"owner": "x"})
+    assert r.status_code == 404
+
+
+def test_audit_logs_recorded_and_listed(client):
+    """管理操作记录审计日志,GET /audit-logs 可查且仅 admin。"""
+    # 删除设备 -> 审计
+    r = client.post("/api/v1/devices", json=make_push())
+    device_id = r.json()["device_id"]
+    client.delete(f"/api/v1/devices/{device_id}")
+
+    # 更新标签 -> 审计
+    r = client.post("/api/v1/devices", json=make_push())
+    device_id = r.json()["device_id"]
+    client.put(f"/api/v1/devices/{device_id}/tags", json={"tags": ["prod"]})
+
+    # 用户管理 -> 审计
+    client.post("/api/v1/users", json={"username": "u1", "password": "p1pass", "role": "viewer"})
+
+    # 修改设置 -> 审计
+    client.put("/api/v1/settings/system", json={"offline_threshold_hours": 48})
+
+    r = client.get("/api/v1/audit-logs")
+    assert r.status_code == 200
+    items = r.json()["items"]
+    actions = [i["action"] for i in items]
+    assert "删除设备" in actions
+    assert "更新标签" in actions
+    assert "创建用户" in actions
+    assert "修改系统设置" in actions
+    # 新在前
+    assert actions[0] == "修改系统设置"
+    # 操作人均为登录的 admin
+    assert all(i["username"] == "admin" for i in items)
+
+    # 按操作人过滤
+    r = client.get("/api/v1/audit-logs?username=admin")
+    assert r.status_code == 200
+    assert all(i["username"] == "admin" for i in r.json()["items"])
+
+
+def test_audit_logs_viewer_forbidden(client):
+    """viewer 访问审计日志返回 403,且 viewer 的读操作不记审计。"""
+    client.post("/api/v1/users", json={"username": "viewer1", "password": "v1pass", "role": "viewer"})
+    assert _login_as(client, "viewer1", "v1pass").status_code == 200
+    assert client.get("/api/v1/audit-logs").status_code == 403
+    assert client.get("/api/v1/devices").status_code == 200
