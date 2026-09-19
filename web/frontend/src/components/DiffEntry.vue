@@ -14,8 +14,11 @@
       </el-radio-group>
     </div>
     <div class="entry-body">
-      <!-- changed:只展示变化的字段,旧值浅红删除线 -> 新值浅绿 -->
+      <!-- changed:身份上下文(未变化字段,确认是不是同一硬件)+ 变化字段红绿对比 -->
       <template v-if="entry.kind === 'changed'">
+        <div v-if="contextRows.length" class="context-row">
+          <span class="context-text">{{ contextRows.map((r) => r.value).join(' · ') }}</span>
+        </div>
         <div v-for="c in entry.changes ?? []" :key="c.field" class="change-row">
           <span class="fname">{{ fieldLabel(c.field) }}</span>
           <span class="old-val mono">{{ fmtValue(c.field, c.old) }}</span>
@@ -86,6 +89,16 @@ const newLabel = computed(() => {
 const rows = computed(() =>
   fullRows((props.entry.kind === 'added' ? props.entry.new : props.entry.old) as Record<string, unknown> | null)
 )
+
+// changed 条目的身份上下文:旧对象中未变化的字段(SN/厂商/型号等),
+// 用于确认"是同一硬件的变化"——没有 SN 上下文就无法确认变化可信
+const contextRows = computed(() => {
+  if (props.entry.kind !== 'changed') return []
+  const changedFields = new Set((props.entry.changes ?? []).map((c) => c.field))
+  return fullRows(props.entry.old as Record<string, unknown> | null).filter(
+    (r) => !changedFields.has(r.key),
+  )
+})
 </script>
 
 <style scoped>
@@ -133,6 +146,16 @@ const rows = computed(() =>
   text-align: right;
 }
 .mono {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+.context-row {
+  padding: 2px 4px 6px;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+  margin-bottom: 4px;
+}
+.context-text {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 .old-val {

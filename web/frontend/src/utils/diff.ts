@@ -55,18 +55,18 @@ export function fmtValue(field: string, v: unknown): string {
 }
 
 // added/removed 条目的完整对象 -> 键值行(跳过空值,size_unit 并入 size)
-export function fullRows(obj: Record<string, unknown> | null): { label: string; value: string }[] {
+export function fullRows(obj: Record<string, unknown> | null): { key: string; label: string; value: string }[] {
   if (!obj) return []
-  const rows: { label: string; value: string }[] = []
+  const rows: { key: string; label: string; value: string }[] = []
   for (const [k, v] of Object.entries(obj)) {
     if (v === null || v === undefined || v === '') continue
     if (k === 'size_unit') continue // 并入容量展示
     if (k === 'size') {
-      rows.push({ label: fieldLabel(k), value: `${v}${obj.size_unit ?? ''}` })
+      rows.push({ key: k, label: fieldLabel(k), value: `${v}${obj.size_unit ?? ''}` })
       continue
     }
     if (Array.isArray(v) && !v.length) continue
-    rows.push({ label: fieldLabel(k), value: fmtValue(k, v) })
+    rows.push({ key: k, label: fieldLabel(k), value: fmtValue(k, v) })
   }
   return rows
 }

@@ -28,11 +28,15 @@
           <div class="summary-bar">
             <div class="summary-info">
               <span class="dev">设备 #{{ pending.device_id }}</span>
+              <router-link :to="`/devices/${pending.device_id}`" class="dev-link">
+                查看设备
+              </router-link>
               <span class="counts">
                 <el-tag type="success" size="small">新增 {{ counts.added }}</el-tag>
                 <el-tag type="danger" size="small">候删 {{ counts.removed }}</el-tag>
                 <el-tag type="warning" size="small">变化 {{ counts.changed }}</el-tag>
               </span>
+              <span class="hint">默认采用新值,可逐条改为保留旧值</span>
             </div>
             <div v-if="isAdmin" class="summary-actions">
               <el-button size="small" @click="keepAllOld">全部保留旧值</el-button>
@@ -392,6 +396,13 @@ async function submit() {
 .dev {
   font-weight: bold;
   font-size: 15px;
+}
+.dev-link {
+  font-size: 13px;
+}
+.hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 .counts {
   display: inline-flex;
